@@ -1,6 +1,6 @@
 # socioeconomico 2023 ####
 rm()
-setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R rendimento/Anual 2024")
+setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R rendimento/Anual 2025")
 library(readxl)
 library(vegan)
 library(tidyr)
@@ -9,7 +9,7 @@ library(ggplot2)
 library(openxlsx)
 library(ggrepel)
 library(lubridate)
-rendimento <- data.frame(read_xlsx("Rendimento 2024.xlsx", sheet="Banco de dados"))
+rendimento <- data.frame(read_xlsx("Rendimento 2025 Anual RES.xlsx", sheet="Banco de dados"))
 rendimento$DATA <-as.Date(rendimento$DATA, format = "%d/%m/%Y") # Data em (mmm aaaa)
 rendimento$Seq <- seq(nrow(rendimento))
 
@@ -48,7 +48,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "black",  # Bar color
+                   col = "yellow1",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(upper_bound)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -106,7 +106,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "deepskyblue",  # Bar color
+                   col = "#045e9a",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(upper_bound)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -157,7 +157,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "red",  # Bar color
+                   col = "#da2420",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(upper_bound)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -208,7 +208,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "chartreuse3",  # Bar color
+                   col = "#009241",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(upper_bound)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -259,7 +259,7 @@ order_vector <- mean_data$ESPÉCIES
 sd_data <- aggregate(CPUE..kg.m..rede. ~ ESPÉCIES, data = data, FUN = sd)
 
 par(mfrow=c(4,1), mar=c(6,0,1,0), oma=c(3,6,1,0))
-par(mfrow=c(4,1), mar=c(4, 4, 1, 1), oma=c(2, 4, 1, 1))
+#par(mfrow=c(4,1), mar=c(4, 4, 1, 1), oma=c(2, 4, 1, 1))
 
 # Calculate the upper and lower bounds for error bars (assuming they are available)
 upper_bound <- mean_data$CPUE..kg.m..rede. + sd_data$CPUE..kg.m..rede.
@@ -271,7 +271,7 @@ bar_mid <- barplot(height = mean_data$CPUE..kg.m..rede.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "black",  # Bar color
+                   col = "yellow1",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(mean_data$CPUE..kg.m..rede.)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -329,7 +329,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "deepskyblue",  # Bar color
+                   col = "#045e9a",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(mean_data$CPUE.Espécie..kg.pescador.dia.)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -380,7 +380,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "red",  # Bar color
+                   col = "#da2420",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(mean_data$CPUE.Espécie..kg.pescador.dia.)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
@@ -431,7 +431,7 @@ bar_mid <- barplot(height = mean_data$CPUE.Espécie..kg.pescador.dia.,
                    main = "",
                    xlab = "",
                    ylab = "CPUE (kg/pescador/dia)",
-                   col = "chartreuse3",  # Bar color
+                   col = "#009241",  # Bar color
                    border = "black",  # Bar border color
                    ylim = c(0, max(mean_data$CPUE.Espécie..kg.pescador.dia.)),  # Set y-axis limits
                    space = 0.2,  # Adjust space between bars
