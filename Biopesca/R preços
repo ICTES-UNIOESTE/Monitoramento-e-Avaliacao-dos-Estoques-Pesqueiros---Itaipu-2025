@@ -6,7 +6,9 @@ library(vegan)
 library(dplyr)
 library(ggplot2)
 library(openxlsx)
-BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_JUNHO-JULHO-AGOSTO.xlsx", sheet="2025"))
+BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet="2025"))
+BioAnual23 <- BioAnual23 %>%
+  filter(tolower(Zona) != "montante")
 Ord <- levels(factor(BioAnual23$Ordem))
 Fam <- levels(factor(BioAnual23$Familia))
 Spp <- levels(factor(BioAnual23$Genero))
@@ -30,7 +32,7 @@ names(BioAnual23)
 # Define a vector of names to be replaced
 names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
                       "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
-                      "Hoplias misionera","Hoplias sp. 3","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
                       "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
                       "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
                       "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
@@ -38,15 +40,14 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
-replacement_names <- c("Mandi","Mandi","Apaiari","Mandi","Linguado","Tucunaré","Tucunaré","Cará","Piau","Jeju",
-                       "Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
-                       "Cascudo","Cascudo","Piavuçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
                        "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
-                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca")
-
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha")
 
 # Substitute names in Genero column
 Preco$Espécie <- ifelse(Preco$Espécie %in% names_to_replace,
@@ -88,13 +89,13 @@ zona_summary <- zona_summary %>%
 
 # Define the complete set of Genero and Zona combinations
 complete_set <- expand.grid(Espécie = unique(zona_summary$Espécie), 
-                            Zona = c("Fluvial", "Transição", "Lacustre","Montante"))
+                            Zona = c("Fluvial", "Transição", "Lacustre"))
 
 # Merge zona_summary with the complete set to add missing combinations
 zona_summary_complete <- merge(zona_summary, complete_set, by = c("Espécie", "Zona"), all = TRUE)
 
 # Order the Zonas
-zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre","Montante"))
+zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre"))
 
 # Order zona_summary_complete by Genero and Zona
 zona_summary_complete <- zona_summary_complete %>% 
@@ -121,7 +122,7 @@ names(BioAnual23)
 # Define a vector of names to be replaced
 names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
                       "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
-                      "Hoplias misionera","Hoplias sp. 3","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
                       "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
                       "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
                       "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
@@ -129,15 +130,14 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
-replacement_names <- c("Mandi","Mandi","Apaiari","Mandi","Linguado","Tucunaré","Tucunaré","Cará","Piau","Jeju",
-                       "Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
-                       "Cascudo","Cascudo","Piavuçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
                        "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
-                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca")
-
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha")
 
 # Substitute names in Genero column
 Preco$Espécie <- ifelse(Preco$Espécie %in% names_to_replace,
@@ -179,13 +179,13 @@ zona_summary <- zona_summary %>%
 
 # Define the complete set of Genero and Zona combinations
 complete_set <- expand.grid(Espécie = unique(zona_summary$Espécie), 
-                            Zona = c("Fluvial", "Transição", "Lacustre","Montante"))
+                            Zona = c("Fluvial", "Transição", "Lacustre"))
 
 # Merge zona_summary with the complete set to add missing combinations
 zona_summary_complete <- merge(zona_summary, complete_set, by = c("Espécie", "Zona"), all = TRUE)
 
 # Order the Zonas
-zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre","Montante"))
+zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre"))
 
 # Order zona_summary_complete by Genero and Zona
 zona_summary_complete <- zona_summary_complete %>% 
@@ -213,7 +213,7 @@ names(BioAnual23)
 # Define a vector of names to be replaced
 names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
                       "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
-                      "Hoplias misionera","Hoplias sp. 3","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
                       "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
                       "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
                       "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
@@ -221,15 +221,14 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
-replacement_names <- c("Mandi","Mandi","Apaiari","Mandi","Linguado","Tucunaré","Tucunaré","Cará","Piau","Jeju",
-                       "Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
-                       "Cascudo","Cascudo","Piavuçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
                        "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
-                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca")
-
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha")
 
 # Substitute names in Genero column
 Preco$Espécie <- ifelse(Preco$Espécie %in% names_to_replace,
@@ -271,13 +270,13 @@ zona_summary <- zona_summary %>%
 
 # Define the complete set of Genero and Zona combinations
 complete_set <- expand.grid(Espécie = unique(zona_summary$Espécie), 
-                            Zona = c("Fluvial", "Transição", "Lacustre","Montante"))
+                            Zona = c("Fluvial", "Transição", "Lacustre"))
 
 # Merge zona_summary with the complete set to add missing combinations
 zona_summary_complete <- merge(zona_summary, complete_set, by = c("Espécie", "Zona"), all = TRUE)
 
 # Order the Zonas
-zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre","Montante"))
+zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre"))
 
 # Order zona_summary_complete by Genero and Zona
 zona_summary_complete <- zona_summary_complete %>% 
@@ -305,7 +304,7 @@ names(BioAnual23)
 # Define a vector of names to be replaced
 names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
                       "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
-                      "Hoplias misionera","Hoplias sp. 3","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
                       "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
                       "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
                       "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
@@ -313,15 +312,14 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
-replacement_names <- c("Mandi","Mandi","Apaiari","Mandi","Linguado","Tucunaré","Tucunaré","Cará","Piau","Jeju",
-                       "Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
-                       "Cascudo","Cascudo","Piavuçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
                        "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
-                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca")
-
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha")
 
 # Substitute names in Genero column
 Preco$Espécie <- ifelse(Preco$Espécie %in% names_to_replace,
@@ -363,13 +361,13 @@ zona_summary <- zona_summary %>%
 
 # Define the complete set of Genero and Zona combinations
 complete_set <- expand.grid(Espécie = unique(zona_summary$Espécie), 
-                            Zona = c("Fluvial", "Transição", "Lacustre","Montante"))
+                            Zona = c("Fluvial", "Transição", "Lacustre"))
 
 # Merge zona_summary with the complete set to add missing combinations
 zona_summary_complete <- merge(zona_summary, complete_set, by = c("Espécie", "Zona"), all = TRUE)
 
 # Order the Zonas
-zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre","Montante"))
+zona_summary_complete$Zona <- factor(zona_summary_complete$Zona, levels = c("Fluvial", "Transição", "Lacustre"))
 
 # Order zona_summary_complete by Genero and Zona
 zona_summary_complete <- zona_summary_complete %>% 
@@ -384,49 +382,144 @@ zona_summary_complete <- zona_summary_complete[, -3]
 
 write.xlsx(zona_summary_complete, file = "Preço por zona peixe filé peixeiro.xlsx")
 
-######################################## RPD vs. rest
-# Convert the date column to Date format and extract year and month
-library(lubridate)
+#######################################
+# Biopesca tri 1, 2025 - SOMENTE MONTANTE (tabelas de MONTANTE) ####
+rm(list = ls())
+setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025")
+
+library(readxl)
+library(vegan)
 library(dplyr)
+library(ggplot2)
+library(openxlsx)
+
+BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet = "2025"))
+
+# >>> Aqui a mudança principal: mantém SOMENTE MONTANTE
 BioAnual23 <- BioAnual23 %>%
-  mutate(Data = as.Date(Data),
-         Year = year(Data),
-         Month = month(Data, label = TRUE, abbr = TRUE))
+  filter(tolower(Zona) == "montante")
 
-# Summarize data: calculate the total count and count for Estágio RPD for each month
-data_summary <- BioAnual23 %>%
-  filter(Year %in% c(2023, 2024)) %>%
-  group_by(Year, Month, Estagio) %>%
-  summarise(Count = n(), .groups = "drop") %>%
-  group_by(Year, Month) %>%
-  mutate(Total = sum(Count),
-         Percent = (Count / Total) * 100) %>%
-  filter(Estagio == "RPD")  # Keep only rows for Estágio RPD
+Ord <- levels(factor(BioAnual23$Ordem))
+Fam <- levels(factor(BioAnual23$Familia))
+Spp <- levels(factor(BioAnual23$Genero))
+Comp <- levels(factor(interaction(BioAnual23$Ordem,
+                                  BioAnual23$Familia,
+                                  BioAnual23$Genero)))
+Comp # Lista de espécie
 
-# Plot for 2023
-plot_2023 <- ggplot(data_summary %>% filter(Year == 2023), aes(x = Month, y = Percent)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  theme_minimal() +
-  labs(title = "Percentage of Estágio RPD per Month (2023)",
-       x = "Month", y = "Percentage (%) of RPD")
+BioAnual23$Mes <- format(BioAnual23$Data, "%b %Y") # Data em (mmm aaaa)
+BioAnual23$Mes <- factor(BioAnual23$Mes)
+BioAnual23$Seq <- seq(nrow(BioAnual23))
 
-plot_2024 <- ggplot(data_summary %>% filter(Year == 2024), aes(x = Month, y = Percent)) +
-  geom_bar(stat = "identity", fill = "darkorange") +
-  theme_minimal() +
-  labs(title = "Porcentagem de peixes em reprodução por mês (2024)",
-       x = "", y = "") +
-  theme(
-    axis.title = element_text(size = 16, face = "bold"),   # Increase axis title size
-    axis.text = element_text(size = 14),                  # Increase axis text size
-    plot.title = element_text(size = 18, face = "bold"),  # Increase title size
-    axis.ticks.length = unit(0.25, "cm"), 
-    panel.grid = element_blank()                          # Remove grid lines
-  ) +
-  scale_y_continuous(limits = c(0, 20), breaks = seq(0, 20, 5), 
-                     labels = function(x) paste0(x, "%")) +  # Add % symbol to Y-axis labels
-  geom_vline(xintercept = 0.5, color = "black", size = 1) +  # Add Y-axis line
-  geom_hline(yintercept = 0, color = "black", size = 1)      # Add X-axis line
+##################################
+# Dicionário de nomes (mantido igual ao seu)
+names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
+                      "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
+                      "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
+                      "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
+                      "Pimelodus maculatus","Pimelodus mysteriosus","Pimelodus ornatus","Pinirampus pirinampu","Plagioscion squamosissimus",
+                      "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
+                      "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
+                      "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
-# Print the plots
-plot_2023
-plot_2024
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+                       "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha")
+
+##################################
+# Função para recodificar nomes (sem alterar sua lógica)
+recodificar_especie <- function(df) {
+  df$Espécie <- ifelse(df$Espécie %in% names_to_replace,
+                       replacement_names[match(df$Espécie, names_to_replace)],
+                       df$Espécie)
+  df <- df[df$Espécie %in% replacement_names, ]
+  return(df)
+}
+
+##################################
+# Função para gerar tabela de resumo (MONTANTE) no mesmo padrão do seu output
+# - Mantém as colunas: Espécies, Zona, Preço_mean, Preço_sd
+# - "Zona" fica como "Montante" (porque aqui não existe Geral = soma de 3 zonas)
+resumo_montante <- function(Preco, preco_col) {
+  out <- aggregate(Preco[[preco_col]] ~ Espécie, data = Preco,
+                   FUN = function(x) c(mean = mean(x), sd = sd(x)))
+  out <- as.data.frame(out)
+  colnames(out) <- c("Espécies", "Preço")
+  out$Zona <- "Montante"
+  out$Preço_mean <- out$Preço[, 1]
+  out$Preço_sd   <- out$Preço[, 2]
+  out <- out[, c("Espécies", "Zona", "Preço_mean", "Preço_sd")]
+  out
+}
+
+##################################
+### 1) PREÇO INTEIRO (PARTICULAR) - MONTANTE
+Preco <- BioAnual23[BioAnual23$Preço.Inteiro..Particular. > 0, ]
+Preco <- Preco[-which(is.na(Preco$Preço.Inteiro..Particular.)), c("Zona", "Espécie", "Preço.Inteiro..Particular.")]
+Preco
+tapply(Preco$Preço.Inteiro..Particular., interaction(Preco$Zona, Preco$Espécie), mean)
+tapply(Preco$Preço.Inteiro..Particular., interaction(Preco$Zona, Preco$Espécie), sd)
+names(BioAnual23)
+
+Preco <- recodificar_especie(Preco)
+
+# >>> Tabela final MONTANTE (substitui o "geral" antigo)
+montante_summary <- resumo_montante(Preco, "Preço.Inteiro..Particular.")
+write.xlsx(montante_summary, file = "Preço geral peixe inteiro particular_MONTANTE.xlsx")
+
+# >>> Como só existe Montante, "por zona" vira a mesma coisa (mantendo o seu padrão de arquivo)
+# (Se quiser NÃO gerar esse arquivo por ser redundante, é só remover estas 2 linhas.)
+write.xlsx(montante_summary, file = "Preço por zona peixe inteiro particular_MONTANTE.xlsx")
+
+#####################
+### 2) PREÇO FILÉ (PARTICULAR) - MONTANTE
+Preco <- BioAnual23[BioAnual23$Preço.Filé..Particular. > 0, ]
+Preco <- Preco[-which(is.na(Preco$Preço.Filé..Particular.)), c("Zona", "Espécie", "Preço.Filé..Particular.")]
+Preco
+tapply(Preco$Preço.Filé..Particular., interaction(Preco$Zona, Preco$Espécie), mean)
+tapply(Preco$Preço.Filé..Particular., interaction(Preco$Zona, Preco$Espécie), sd)
+names(BioAnual23)
+
+Preco <- recodificar_especie(Preco)
+
+montante_summary <- resumo_montante(Preco, "Preço.Filé..Particular.")
+write.xlsx(montante_summary, file = "Preço geral peixe filé particular_MONTANTE.xlsx")
+write.xlsx(montante_summary, file = "Preço por zona peixe filé particular_MONTANTE.xlsx")
+
+#####################
+### 3) PREÇO INTEIRO (PEIXEIRO) - MONTANTE
+Preco <- BioAnual23[BioAnual23$Preço.Inteiro..Peixeiro. > 0, ]
+Preco <- Preco[-which(is.na(Preco$Preço.Inteiro..Peixeiro.)), c("Zona", "Espécie", "Preço.Inteiro..Peixeiro.")]
+Preco
+tapply(Preco$Preço.Inteiro..Peixeiro., interaction(Preco$Zona, Preco$Espécie), mean)
+tapply(Preco$Preço.Inteiro..Peixeiro., interaction(Preco$Zona, Preco$Espécie), sd)
+names(BioAnual23)
+
+Preco <- recodificar_especie(Preco)
+
+montante_summary <- resumo_montante(Preco, "Preço.Inteiro..Peixeiro.")
+write.xlsx(montante_summary, file = "Preço geral peixe inteiro peixeiro_MONTANTE.xlsx")
+write.xlsx(montante_summary, file = "Preço por zona peixe inteiro peixeiro_MONTANTE.xlsx")
+
+#####################
+### 4) PREÇO FILÉ (PEIXEIRO) - MONTANTE
+Preco <- BioAnual23[BioAnual23$Preço.Filé..Peixeiro. > 0, ]
+Preco <- Preco[-which(is.na(Preco$Preço.Filé..Peixeiro.)), c("Zona", "Espécie", "Preço.Filé..Peixeiro.")]
+Preco
+tapply(Preco$Preço.Filé..Peixeiro., interaction(Preco$Zona, Preco$Espécie), mean)
+tapply(Preco$Preço.Filé..Peixeiro., interaction(Preco$Zona, Preco$Espécie), sd)
+names(BioAnual23)
+
+Preco <- recodificar_especie(Preco)
+
+montante_summary <- resumo_montante(Preco, "Preço.Filé..Peixeiro.")
+write.xlsx(montante_summary, file = "Preço geral peixe filé peixeiro_MONTANTE.xlsx")
+write.xlsx(montante_summary, file = "Preço por zona peixe filé peixeiro_MONTANTE.xlsx")
+
+#######################################
+
