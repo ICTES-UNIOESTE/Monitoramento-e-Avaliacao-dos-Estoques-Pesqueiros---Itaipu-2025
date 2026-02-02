@@ -40,7 +40,7 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
 replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
@@ -130,7 +130,7 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
 replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
@@ -221,7 +221,7 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
 replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
@@ -312,7 +312,7 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 # Define corresponding replacement names
 replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
@@ -423,7 +423,7 @@ names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus 
                       "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
                       "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
                       "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
-                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro zungaro","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis")
 
 replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
                        "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
@@ -472,9 +472,6 @@ Preco <- recodificar_especie(Preco)
 montante_summary <- resumo_montante(Preco, "Preço.Inteiro..Particular.")
 write.xlsx(montante_summary, file = "Preço geral peixe inteiro particular_MONTANTE.xlsx")
 
-# >>> Como só existe Montante, "por zona" vira a mesma coisa (mantendo o seu padrão de arquivo)
-# (Se quiser NÃO gerar esse arquivo por ser redundante, é só remover estas 2 linhas.)
-write.xlsx(montante_summary, file = "Preço por zona peixe inteiro particular_MONTANTE.xlsx")
 
 #####################
 ### 2) PREÇO FILÉ (PARTICULAR) - MONTANTE
@@ -489,7 +486,6 @@ Preco <- recodificar_especie(Preco)
 
 montante_summary <- resumo_montante(Preco, "Preço.Filé..Particular.")
 write.xlsx(montante_summary, file = "Preço geral peixe filé particular_MONTANTE.xlsx")
-write.xlsx(montante_summary, file = "Preço por zona peixe filé particular_MONTANTE.xlsx")
 
 #####################
 ### 3) PREÇO INTEIRO (PEIXEIRO) - MONTANTE
@@ -504,7 +500,6 @@ Preco <- recodificar_especie(Preco)
 
 montante_summary <- resumo_montante(Preco, "Preço.Inteiro..Peixeiro.")
 write.xlsx(montante_summary, file = "Preço geral peixe inteiro peixeiro_MONTANTE.xlsx")
-write.xlsx(montante_summary, file = "Preço por zona peixe inteiro peixeiro_MONTANTE.xlsx")
 
 #####################
 ### 4) PREÇO FILÉ (PEIXEIRO) - MONTANTE
@@ -519,7 +514,6 @@ Preco <- recodificar_especie(Preco)
 
 montante_summary <- resumo_montante(Preco, "Preço.Filé..Peixeiro.")
 write.xlsx(montante_summary, file = "Preço geral peixe filé peixeiro_MONTANTE.xlsx")
-write.xlsx(montante_summary, file = "Preço por zona peixe filé peixeiro_MONTANTE.xlsx")
 
 #######################################
 
