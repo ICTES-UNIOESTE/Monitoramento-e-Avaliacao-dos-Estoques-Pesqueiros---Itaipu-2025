@@ -1,0 +1,109 @@
+#######################################
+# Biopesca tri 1, 2025 - SOMENTE MONTANTE (tabelas de MONTANTE) ####
+rm(list = ls())
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025")
+
+library(readxl)
+library(dplyr)
+library(openxlsx)
+
+BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet = "2025"))
+
+# >>> Mantém SOMENTE MONTANTE
+BioAnual23 <- BioAnual23 %>%
+  filter(tolower(Zona) == "montante")
+
+##################################
+# Dicionário de nomes (mantido igual ao seu)
+names_to_replace <- c("Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis","Auchenipterus osteomystax","Catathyridium jenynsii",
+                      "Cichla kelberi","Cichla piquiti","Geophagus sveni","Hemiodus orthonops","Hoplerythrinus unitaeniatus","Hoplias mbigua",
+                      "Hoplias misionera","Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus","Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+                      "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris","Loricariichthys platymetopon",
+                      "Loricariichthys rostratus","Megalancistrus parananus","Megaleporinus macrocephalus","Megaleporinus obtusidens",
+                      "Megaleporinus piavussu","Metynnis lippincottianus","Oreochromis niloticus","Piaractus mesopotamicus","Pimelodella avanhandavae",
+                      "Pimelodus maculatus","Pimelodus mysteriosus","Pimelodus ornatus","Pinirampus pirinampu","Plagioscion squamosissimus",
+                      "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus","Pseudoplatystoma corruscans","Pterodoras granulosus",
+                      "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera","Satanoperca setepele","Schizodon altoparanae",
+                      "Schizodon borellii","Schizodon nasutus","Serrasalmus maculatus","Serrasalmus maculatus (preta)","Serrasalmus marginatus",
+                      "Sorubim lima","Trachelyopterus galeatus","Traíra","Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu","Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata","Crenicichla saxatilis",
+                      "Crenicichla saxatilis", "Saxatilia britskii")
+
+replacement_names <- c("Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré","Cará","Bananinha","Jeju",
+                       "Traíra","Traíra","Traíra","Traíra","Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau","Cascudo",
+                       "Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa","Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado",
+                       "Corvina","Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro","Cascudo","Cará","Piau","Piau","Piau",
+                       "Piranha","Piranha","Piranha","Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa","Bagre Africano","Joaninha","Joaninha",
+                       "Joaninha","Joaninha")
+
+recodificar_especie <- function(df) {
+  df$Espécie <- ifelse(df$Espécie %in% names_to_replace,
+                       replacement_names[match(df$Espécie, names_to_replace)],
+                       df$Espécie)
+  df <- df[df$Espécie %in% replacement_names, ]
+  return(df)
+}
+
+##################################
+# Resumo Montante (mantido igual ao seu)
+resumo_montante <- function(df, preco_col) {
+  df %>%
+    group_by(Espécie) %>%
+    summarise(
+      Preço_mean = mean(.data[[preco_col]], na.rm = TRUE),
+      Preço_sd   = sd(.data[[preco_col]], na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    transmute(
+      Espécies = Espécie,
+      Zona = "Montante",
+      Preço_mean,
+      Preço_sd
+    )
+}
+
+
+##################################
+# FUNÇÃO: junta Inteiro + Filé em uma coluna única de preço (por comprador)
+juntar_precos <- function(df, col_inteiro, col_file) {
+  
+  p1 <- df %>%
+    transmute(Zona, Espécie, Preco = .data[[col_inteiro]]) %>%
+    filter(!is.na(Preco), Preco > 0)
+  
+  p2 <- df %>%
+    transmute(Zona, Espécie, Preco = .data[[col_file]]) %>%
+    filter(!is.na(Preco), Preco > 0)
+  
+  bind_rows(p1, p2)
+}
+
+
+##################################
+### (A) PEIXE INTEIRO "UNIFICADO" — PARTICULAR (Inteiro + Filé)
+Preco_particular <- juntar_precos(
+  BioAnual23,
+  col_inteiro = "Preço.Inteiro..Particular.",
+  col_file    = "Preço.Filé..Particular."
+)
+
+Preco_particular <- recodificar_especie(Preco_particular)
+
+montante_summary_particular <- resumo_montante(Preco_particular, "Preco")
+write.xlsx(montante_summary_particular,
+           file = "Preço geral peixe inteiro particular_MONTANTE.xlsx")
+
+##################################
+### (B) PEIXE INTEIRO "UNIFICADO" — PEIXEIRO (Inteiro + Filé)
+Preco_peixeiro <- juntar_precos(
+  BioAnual23,
+  col_inteiro = "Preço.Inteiro..Peixeiro.",
+  col_file    = "Preço.Filé..Peixeiro."
+)
+
+Preco_peixeiro <- recodificar_especie(Preco_peixeiro)
+
+montante_summary_peixeiro <- resumo_montante(Preco_peixeiro, "Preco")
+write.xlsx(montante_summary_peixeiro,
+           file = "Preço geral peixe inteiro peixeiro_MONTANTE.xlsx")
+
+#######################################
