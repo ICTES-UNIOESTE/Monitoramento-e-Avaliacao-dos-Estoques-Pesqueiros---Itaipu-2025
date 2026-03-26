@@ -1,0 +1,547 @@
+# ============================================================
+# BIOPESCA 2025 - SOMENTE MONTANTE
+# Gráficos ggplot: fill="gray", color="black"
+# ============================================================
+
+rm(list = ls())
+
+# -----------------------
+# Pacotes
+# -----------------------
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(vegan)
+library(openxlsx)
+library(ecodist)
+library(labdsv)
+
+# -----------------------
+# Ler dados
+# -----------------------
+setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025")
+BioAnual25 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet = "2025"))
+
+# >>> FILTRO: somente Montante (antes você EXCLUÍA Montante)
+BioAnual25 <- BioAnual25 %>%
+  filter(tolower(Zona) == "montante")
+
+# Lista de espécies (para loops posteriores)
+Comp <- levels(factor(BioAnual25$Espécie))
+
+# Data -> Mês (mmm aaaa)
+BioAnual25$Mes <- format(BioAnual25$Data, "%b %Y")
+BioAnual25$Mes <- factor(BioAnual25$Mes)
+BioAnual25$Seq <- seq_len(nrow(BioAnual25))
+
+# ============================================================
+# AJUSTES DE ORDEM DE MESES (use os meses que existirem)
+# ============================================================
+# Se você quer fixar Mar-Out, mantenha assim:
+column_order <- c("Mar 2025", "Apr 2025", "May 2025", "Jun 2025", "Jul 2025","Aug 2025","Sep 2025","Oct 2025")
+
+# Se a sua base tiver meses fora disso, comente o select(column_order)
+# e use: sort(unique(BioAnual25$Mes))
+
+# ============================================================
+# 1) ESFORÇO: N pescadores por mês (Montante)
+# ============================================================
+nPescadorMes <- BioAnual25 %>%
+  group_by(`Código.Pescador`, Mes) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Mes) %>%
+  summarise(N_pescadores = n_distinct(`Código.Pescador`), .groups = "drop")
+
+# Tabela “linha única” (para manter padrão do seu script)
+PescadoresMes <- t(as.data.frame(nPescadorMes)$N_pescadores)
+colnames(PescadoresMes) <- as.character(nPescadorMes$Mes)
+PescadoresMes <- as.data.frame(PescadoresMes)
+rownames(PescadoresMes) <- "Montante"
+
+# Ordena meses (se existirem)
+PescadoresMes <- PescadoresMes %>%
+  select(any_of(column_order))
+
+# Renomear meses (opcional, padrão pt)
+names(PescadoresMes) <- str_replace_all(names(PescadoresMes),
+                                        c("Mar 2025"="Mar","Apr 2025"="Abr","May 2025"="Mai","Jun 2025"="Jun","Jul 2025"="Jul","Aug 2025"="Ago","Sep 2025"="Set","Oct 2025"="Out"))
+
+# Long para plot
+PescadoresMes$Zona <- rownames(PescadoresMes)
+PescadoresMes_long <- pivot_longer(PescadoresMes, cols = -Zona, names_to = "Month", values_to = "Value")
+PescadoresMes_long$Month <- factor(PescadoresMes_long$Month, levels = names(PescadoresMes)[names(PescadoresMes) != "Zona"])
+
+ggplot(PescadoresMes_long, aes(x = Month, y = Value, group = 1)) +
+  geom_line(color = "grey", linewidth = 1) +
+  geom_point(color = "grey", size = 2.5) +
+  labs(x = "Mês", y = "Número de pescadores") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +
+  scale_y_continuous(breaks = seq(0, ceiling(25), by = 5), limits = c(1, 25))    #ceiling(max(PescadoresMes_long$Value))
+
+# ============================================================
+# 2) CPUE em NÚMERO: n peixes / pescador / mês (Montante)
+# ============================================================
+BioAnual25$N <- 1
+
+nMes <- BioAnual25 %>%
+  group_by(Mes) %>%
+  summarise(N_total = sum(N, na.rm = TRUE), .groups = "drop")
+
+# CPUE número por mês = total indivíduos / N pescadores do mês
+CPUE_Numero_Mensal <- nMes %>%
+  left_join(nPescadorMes, by = "Mes") %>%
+  mutate(CPUE_num = N_total / N_pescadores) %>%
+  select(Mes, CPUE_num)
+
+# Tabela linha única (para ficar como seu padrão)
+CPUE_Numero_Mensal_mat <- t(CPUE_Numero_Mensal$CPUE_num)
+colnames(CPUE_Numero_Mensal_mat) <- as.character(CPUE_Numero_Mensal$Mes)
+CPUE_Numero_Mensal_mat <- as.data.frame(CPUE_Numero_Mensal_mat)
+rownames(CPUE_Numero_Mensal_mat) <- "Montante"
+
+CPUE_Numero_Mensal_mat <- CPUE_Numero_Mensal_mat %>%
+  select(any_of(column_order))
+
+names(CPUE_Numero_Mensal_mat) <- str_replace_all(names(CPUE_Numero_Mensal_mat),
+                                                 c("Mar 2025"="Mar","Apr 2025"="Abr","May 2025"="Mai","Jun 2025"="Jun","Jul 2025"="Jul","Aug 2025"="Ago","Sep 2025"="Set","Oct 2025"="Out"))
+
+CPUE_Numero_Mensal_mat$Zona <- rownames(CPUE_Numero_Mensal_mat)
+CPUE_Numero_Mensal_long <- pivot_longer(CPUE_Numero_Mensal_mat, cols = -Zona, names_to = "Month", values_to = "Value")
+CPUE_Numero_Mensal_long$Month <- factor(CPUE_Numero_Mensal_long$Month, levels = names(CPUE_Numero_Mensal_mat)[names(CPUE_Numero_Mensal_mat) != "Zona"])
+
+ggplot(CPUE_Numero_Mensal_long, aes(x = Month, y = Value, group = 1)) +
+  geom_line(color = "grey", linewidth = 1) +
+  geom_point(color = "grey", size = 2.5) +
+  labs(x = "Mês", y = "CPUE: número de peixes por pescador") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +
+  scale_y_continuous(breaks = seq(0, 40, by = 5), limits = c(0, 40)) #ceiling(max(CPUE_Numero_Mensal_long$Value))
+
+# ============================================================
+# 3) CPUE em BIOMASSA: g / pescador / mês (Montante)
+# ============================================================
+bMes <- BioAnual25 %>%
+  group_by(Mes) %>%
+  summarise(B_total_g = sum(Peso.total..g., na.rm = TRUE), .groups = "drop")
+
+CPUE_Biomassa_Mensal <- bMes %>%
+  left_join(nPescadorMes, by = "Mes") %>%
+  mutate(CPUE_biom_g = B_total_g / N_pescadores) %>%
+  select(Mes, CPUE_biom_g)
+
+CPUE_Biomassa_Mensal_mat <- t(CPUE_Biomassa_Mensal$CPUE_biom_g)
+colnames(CPUE_Biomassa_Mensal_mat) <- as.character(CPUE_Biomassa_Mensal$Mes)
+CPUE_Biomassa_Mensal_mat <- as.data.frame(CPUE_Biomassa_Mensal_mat)
+rownames(CPUE_Biomassa_Mensal_mat) <- "Montante"
+
+CPUE_Biomassa_Mensal_mat <- CPUE_Biomassa_Mensal_mat %>%
+  select(any_of(column_order))
+
+names(CPUE_Biomassa_Mensal_mat) <- str_replace_all(names(CPUE_Biomassa_Mensal_mat),
+                                                   c("Mar 2025"="Mar","Abr 2025"="Abr","Mai 2025"="Mai","Jun 2025"="Jun","Jul 2025"="Jul","Ago 2025"="Ago","Set 2025"="Set","Out 2025"="Out"))
+
+CPUE_Biomassa_Mensal_mat$Zona <- rownames(CPUE_Biomassa_Mensal_mat)
+CPUE_Biomassa_Mensal_long <- pivot_longer(CPUE_Biomassa_Mensal_mat, cols = -Zona, names_to = "Month", values_to = "Value")
+CPUE_Biomassa_Mensal_long$Month <- factor(CPUE_Biomassa_Mensal_long$Month, levels = names(CPUE_Biomassa_Mensal_mat)[names(CPUE_Biomassa_Mensal_mat) != "Zona"])
+
+ggplot(CPUE_Biomassa_Mensal_long, aes(x = Month, y = Value, group = 1)) +
+  geom_line(color = "gray", linewidth = 1) +
+  geom_point(color = "gray", size = 2.5) +
+  labs(x = "Mês", y = "CPUE: biomassa (g) por pescador") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +  # Justification of legend
+  #ylim(0, max(PescadoresMes_long$Value) + 1)
+  scale_y_continuous(breaks = seq(0, ceiling(60000), by = 5000), limits = c(0, 60000)) #max(CPUE_Biomassa_Mensal_long$Value)
+
+# ============================================================
+# 4) Riqueza e Diversidade (Shannon, Riqueza, Pielou J) - Montante
+#    (mesmo conceito do seu script, só que sem zonas)
+# ============================================================
+Shannon <- rep(NA, length(levels(BioAnual25$Mes)))
+Riqueza <- rep(NA, length(levels(BioAnual25$Mes)))
+
+for (i in seq_along(levels(BioAnual25$Mes))) {
+  Dados <- BioAnual25[BioAnual25$Mes == levels(BioAnual25$Mes)[i], ]
+  
+  # abundância por espécie no mês
+  nSpp_mes <- tapply(Dados$N, Dados$Espécie, sum, default = 0)
+  nSpp_mes <- nSpp_mes[!is.na(nSpp_mes)]
+  
+  # esforço no mês
+  n_pesc <- nPescadorMes$N_pescadores[nPescadorMes$Mes == levels(BioAnual25$Mes)[i]]
+  if (length(n_pesc) == 0 || is.na(n_pesc) || n_pesc == 0) next
+  
+  # CPUE por espécie no mês
+  cpue_spp <- nSpp_mes / n_pesc
+  
+  Shannon[i] <- diversity(cpue_spp, index = "shannon")
+  Riqueza[i] <- specnumber(cpue_spp)
+}
+
+J <- Shannon / log(Riqueza)
+
+df_attr <- data.frame(
+  Mes = levels(BioAnual25$Mes),
+  Shannon = Shannon,
+  Riqueza = Riqueza,
+  PielouJ = J
+)
+
+# ordem desejada (Mar -> Out)
+mes_ordem <- c("Mar 2025","Apr 2025","May 2025","Jun 2025","Jul 2025","Aug 2025","Sep 2025","Oct 2025")
+
+df_attr <- df_attr %>%
+  mutate(
+    Mes = factor(as.character(Mes), levels = mes_ordem, ordered = TRUE)
+  ) %>%
+  arrange(Mes)
+
+df_attr$Mes <- str_replace_all(df_attr$Mes,
+                               c("Mar 2025"="Mar","Apr 2025"="Abr","May 2025"="Mai","Jun 2025"="Jun","Jul 2025"="Jul","Aug 2025"="Ago","Sep 2025"="Set","Oct 2025"="Out"))
+
+# 1) defina a ordem correta
+mes_ordem <- c("Mar","Abr","Mai","Jun","Jul","Ago","Set","Out")
+
+# 2) transforme Mes em fator ordenado
+df_attr <- df_attr %>%
+  mutate(Mes = factor(Mes, levels = mes_ordem, ordered = TRUE)) %>%
+  arrange(Mes)
+
+# Shannon
+ggplot(df_attr, aes(x = Mes, y = Shannon, group = 1)) +
+  geom_line(color = "grey", linewidth = 1) +
+  geom_point(color = "grey", size = 2.5) +
+  labs(x = "Mês", y = "Índice de Shannon-Weaver") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +  # Justification of legend
+  #ylim(0, max(PescadoresMes_long$Value) + 1)
+  scale_y_continuous(breaks = seq(0, 3, by = 0.5), limits = c(0, 3))
+
+# Riqueza
+ggplot(df_attr, aes(x = Mes, y = Riqueza, group = 1)) +
+  geom_line(color = "grey", linewidth = 1) +
+  geom_point(color = "grey", size = 2.5) +
+  labs(x = "Mês", y = "Riqueza de espécies") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +  # Justification of legend
+  #ylim(0, max(PescadoresMes_long$Value) + 1)
+  scale_y_continuous(breaks = seq(0, ceiling(30), by = 5), limits = c(0, 30)) #ceiling(max(Riqueza_long$Value))
+
+# Pielou J (remove NA/Inf)
+df_J <- df_attr %>% filter(is.finite(PielouJ), !is.na(PielouJ), PielouJ > 0)
+
+ggplot(df_J, aes(x = Mes, y = PielouJ, group = 1)) +
+  geom_line(color = "grey", linewidth = 1) +
+  geom_point(color = "grey", size = 2.5) +
+  labs(x = "Mês", y = "Equitabilidade de Pielou (J)") +
+  theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major gridlines for x-axis
+    panel.grid.minor.x = element_blank(),  # Remove minor gridlines for x-axis
+    #panel.grid.major.y = element_blank(),
+    panel.grid.major.y = element_line(color = "gray", size = 0.1),  # Keep major gridlines for y-axis
+    panel.grid.minor.y = element_blank(),  # Remove minor gridlines for y-axis
+    axis.line.x = element_line(color = "black", size = 1),  # X-axis line
+    axis.line.y = element_line(color = "black", size = 1),  # Y-axis line
+    axis.text.x = element_text(size = 20),  # Increase X-axis text size
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),  # Increase X-axis label size
+    axis.title.y = element_text(size = 22),  # Increase Y-axis label size
+    legend.text = element_text(size = 20),   # Increase legend text size
+    legend.title = element_text(size = 22),   # Increase legend title size
+    legend.position = "right",  # Position of legend
+    legend.justification = "bottom") +  # Justification of legend
+  scale_y_continuous(breaks = seq(0, 1, by = 0.2), limits = c(0, 1)) #ceiling(max(Riqueza_long$Value))
+
+
+# ============================================================
+# 5) Whitaker plot (Top 10 espécies CPUE(log) - Montante)
+#    Aqui: CPUE por espécie = total indivíduos / total pescadores
+# ============================================================
+# 1) Garantir que você está mesmo com a Montante
+# 5) Whitaker plot (Top 10 espécies CPUE(log) - Montante)
+# ============================================================
+
+# ----------------------------
+# 1) Filtrar Montante + criar N=1
+# 1) Filtrar Montante + criar N=1
+BioAnual_mont <- BioAnual25 %>%              # <-- troque para BioAnual23 se for o dataset certo
+  filter(tolower(Zona) == "montante") %>%
+  mutate(N = 1)
+
+# 2) Esforço (nº pescadores) - Montante
+n_pesc_mont <- BioAnual_mont %>%
+  distinct(`Código.Pescador`) %>%
+  nrow()
+
+# 3) CPUE por espécie (Montante) - RAW
+CPUE_mont <- BioAnual_mont %>%
+  group_by(Espécie) %>%
+  summarise(N = sum(N, na.rm = TRUE), .groups = "drop") %>%
+  mutate(CPUE = N / n_pesc_mont) %>%
+  arrange(desc(CPUE))
+
+# 4) Top 10 + ordem p/ coord_flip (maior no topo)
+top10 <- CPUE_mont %>%
+  slice_head(n = 10) %>%
+  mutate(
+    Espécie = factor(Espécie, levels = Espécie[order(CPUE)])  # com flip: maior fica no topo
+  )
+
+# 5) Plot RAW CPUE
+p_mont_raw <- ggplot(top10, aes(x = Espécie, y = CPUE, fill = CPUE)) +
+  geom_col(color = "black", linewidth = 0.6) +
+  scale_fill_gradient(low = "gray90", high = "gray20") +
+  coord_flip() +
+  labs(
+    x = NULL,
+    y = "CPUE(log) - número de peixes por pescador",
+    title = "Montante"
+  ) +
+  theme_minimal(base_size = 16) +
+  theme(
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(face = "italic", size = 14),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.line.x = element_line(color = "black", linewidth = 1),
+    axis.line.y = element_line(color = "black", linewidth = 1),
+    legend.position = "none",
+    plot.background  = element_rect(fill = "white", color = NA),
+    panel.background = element_rect(fill = "white", color = NA)
+  )
+
+print(p_mont_raw)
+
+
+# ============================================================
+# 7) Parâmetros de CP (tabela + histograma em cinza)
+# ============================================================
+stats_montante <- BioAnual25 %>%
+  summarize(
+    `Comprimento Padrão Mínimo` = min(CP, na.rm = TRUE),
+    `Comprimento Padrão Máximo` = max(CP, na.rm = TRUE),
+    `Comprimento Padrão Média`  = mean(CP, na.rm = TRUE)
+  ) %>%
+  mutate(Tipo = "Montante")
+
+print(stats_montante)
+
+write.xlsx(stats_montante,
+           file = "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025/Comprimento Espécies Montante.xlsx",
+           rowNames = FALSE)
+
+########################################
+##############################3
+###############################################################3 CONTINUAAAAA DAQUI
+# Histograma (base R) em cinza com borda preta
+par(mfrow = c(1,1), mar = c(4,6,2,1))
+x <- hist(BioAnual25$CP, main = "", col = "gray", border = "black", xlab = "Comprimento Padrão (cm)")
+abline(v = mean(BioAnual25$CP, na.rm = TRUE), col = "black", lwd = 3)
+
+# ============================================================
+# 8) Peso-Comprimento, min/max, sexos, maturidade (Montante)
+#    (mantive seu bloco com tryCatch, só trocando BioAnual23 -> BioAnual25)
+# ============================================================
+TabParametros <- matrix(NA, nrow = length(Comp), ncol = 17)
+colnames(TabParametros) <- c("CP.min", "CP.max", "WT.min", "WT.max","a","b","2,5%","97,5%","% fêmeas","% machos", "% jovens","% adultos",
+                             "N total", "N machos", "N fêmeas", "N jovens", "N adultos")
+rownames(TabParametros) <- Comp
+
+for(i in seq_along(Comp)){
+  tryCatch({
+    TabParametros[i, 1:2] <- range(BioAnual25$CP[BioAnual25$Espécie == Comp[i]], na.rm = TRUE)
+    TabParametros[i, 3:4] <- range(BioAnual25$Peso.total..g.[BioAnual25$Espécie == Comp[i]], na.rm = TRUE)
+    
+    x <- BioAnual25$CP[BioAnual25$Espécie == Comp[i]]
+    y <- BioAnual25$Peso.total..g.[BioAnual25$Espécie == Comp[i]]
+    
+    gender_counts <- BioAnual25$Sexo[BioAnual25$Espécie == Comp[i]]
+    gender_counts <- na.omit(gender_counts)
+    
+    if(length(gender_counts) > 0){
+      TabParametros[i, 9]  <- (sum(gender_counts == "F", na.rm = TRUE) / length(gender_counts)) * 100
+      TabParametros[i, 10] <- (sum(gender_counts == "M", na.rm = TRUE) / length(gender_counts)) * 100
+      TabParametros[i, 15] <- sum(gender_counts == "F", na.rm = TRUE)
+      TabParametros[i, 14] <- sum(gender_counts == "M", na.rm = TRUE)
+    }
+    
+    maturidade <- BioAnual25$Estagio[BioAnual25$Espécie == Comp[i]]
+    TabParametros[i, 13] <- length(maturidade)
+    
+    maturidade2 <- maturidade[!is.na(maturidade)]
+    if(length(maturidade2) > 0){
+      TabParametros[i, 11] <- (sum(maturidade2 == "IMT", na.rm = TRUE) / length(maturidade2)) * 100
+      count_adult <- maturidade2[maturidade2 != "IMT"]
+      TabParametros[i, 12] <- (length(count_adult) / length(maturidade2)) * 100
+      TabParametros[i, 16] <- sum(maturidade2 == "IMT", na.rm = TRUE)
+      TabParametros[i, 17] <- sum(maturidade2 != "IMT", na.rm = TRUE)
+    }
+    
+    if(length(y) > 20){
+      WT_LT <- lm(log10(y) ~ log10(x))
+      TabParametros[i, 5] <- round(10^WT_LT$coefficients[1], 4)
+      TabParametros[i, 6] <- round(WT_LT$coefficients[2], 4)
+      parametros <- cbind(coef(WT_LT), confint(WT_LT))
+      TabParametros[i, 7] <- parametros[2,2]
+      TabParametros[i, 8] <- parametros[2,3]
+    }
+    
+  }, error = function(e) {
+    cat("Erro na espécie:", Comp[i], "\n")
+    TabParametros[i, ] <- NA
+  })
+}
+
+TabParametros[!is.finite(TabParametros)] <- NA
+TabParametros <- as.data.frame(TabParametros)
+
+write.xlsx(TabParametros,
+           file = "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025/Parametros_especies_Montante.xlsx",
+           rowNames = TRUE)
+
+# ============================================================
+# 9) Reprodução (base R) - Montante
+#     (barras cinza + borda preta)
+# ============================================================
+# garante ordem desejada dos estágios:
+stage_order <- c("IMT","MAT","RPD","ESG","REG")
+
+# tabela com todos os níveis (mesmo se faltar algum)
+repM <- table(factor(BioAnual25$Estagio, levels = stage_order))
+
+# matriz 5x1 (linhas = estágios, coluna = Montante)
+repMat <- matrix(as.numeric(repM), ncol = 1,
+                 dimnames = list(stage_order, "Montante"))
+
+# (opcional) ver
+repMat
+
+par(mfrow=c(1,1), mar=c(4,6,1,1))
+
+bp <- barplot(repMat, beside = TRUE, horiz = TRUE, yaxt = "n",
+              col = "gray", border = "black",
+              xlim = c(0, 1.4 * max(repMat, na.rm = TRUE)))
+
+# eixo Y com os estágios (como você já fazia no outro script)
+axis(side = 2, at = bp, labels = rownames(repMat), las = 2)
+
+mtext("Frequência (Número de indivíduos)", side = 1, line = 3, cex = 1.25)
+mtext("Estágios Reprodutivos", side = 2, line = 4, cex = 1.25, las = 0)
+# ============================================================
+# 10) Alimentação (base R) - Montante
+# ============================================================
+# Alimentação (GR) - Montante (base R)
+# ============================================================
+
+aliM <- table(BioAnual25$GR)
+
+# (opcional) se quiser remover NA explicitamente
+# aliM <- table(BioAnual25$GR, useNA = "no")
+
+# matriz Kx1 (linhas = categorias GR, coluna = Montante)
+aliMat <- matrix(as.numeric(aliM), ncol = 1,
+                 dimnames = list(names(aliM), "Montante"))
+
+# (opcional) ver
+aliMat
+
+par(mfrow=c(1,1), mar=c(4,6,1,1))
+
+bp <- barplot(aliMat, beside=TRUE, horiz=TRUE, yaxt="n",
+              col="gray", border="black",
+              xlim=c(0, 1.2 * max(aliMat, na.rm=TRUE)))
+
+# eixo Y com as categorias do GR
+axis(side=2, at=bp, labels=rownames(aliMat), las=2)
+
+# texto em pé ao lado do eixo Y
+mtext("Grau de Repleção", side=2, line=4, cex=1.25, las=0)
+
+# eixo X
+mtext("Frequência (Número de indivíduos)", side=1, line=3, cex=1.25)
+
+# ============================================================
+# Fim
+# ============================================================
+cat("✅ Finalizado para somente Montante.\n")
