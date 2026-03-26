@@ -1,0 +1,323 @@
+rm(list = ls())
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(openxlsx)
+library(stringr)
+
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu")
+
+# =========================
+# 1) LEITURA DAS BASES
+# =========================
+
+# BIOPESCA (mesma base)
+BioAnual23 <- data.frame(
+  read_xlsx("R biopesca/Anual 2025/Biopesca_2025_ANUAL.xlsx", sheet = "2025")
+)
+
+# RENDIMENTO GERAL
+rendimento_geral_base <- data.frame(
+  read_xlsx("R rendimento/Anual 2025/Rendimento 2025 Anual RES.xlsx",
+            sheet = "Banco de dados")
+)
+
+# RENDIMENTO MONTANTE (ARQUIVO SEPARADO)
+rendimento_montante_base <- data.frame(
+  read_xlsx("R rendimento/Anual 2025/Rendimento_2025_MONTANTE_ANUAL.xlsx",
+            sheet = "Banco de dados")
+)
+
+# padronização de datas
+if ("DATA" %in% names(rendimento_geral_base)) {
+  rendimento_geral_base$DATA <- as.Date(rendimento_geral_base$DATA, format = "%d/%m/%Y")
+}
+if ("DATA" %in% names(rendimento_montante_base)) {
+  rendimento_montante_base$DATA <- as.Date(rendimento_montante_base$DATA, format = "%d/%m/%Y")
+}
+
+# padronização simples das zonas
+BioAnual23 <- BioAnual23 %>%
+  mutate(Zona = trimws(as.character(Zona)))
+
+rendimento_geral_base <- rendimento_geral_base %>%
+  mutate(ZONA = trimws(as.character(ZONA)))
+
+# se a base do montante não tiver coluna ZONA, cria
+if (!"ZONA" %in% names(rendimento_montante_base)) {
+  rendimento_montante_base$ZONA <- "Montante"
+} else {
+  rendimento_montante_base <- rendimento_montante_base %>%
+    mutate(ZONA = trimws(as.character(ZONA)))
+}
+
+# =========================
+# 2) DICIONÁRIO ESPÉCIE -> ESTOQUE
+# =========================
+names_to_replace <- c(
+  "Ageneiosus inermis","Ageneiosus ucayalensis","Astronotus crassipinnis",
+  "Auchenipterus osteomystax","Catathyridium jenynsii","Cichla kelberi",
+  "Cichla piquiti","Geophagus sveni","Hemiodus orthonops",
+  "Hoplerythrinus unitaeniatus","Hoplias mbigua","Hoplias misionera",
+  "Hoplias sp.3","Hoplias sp.2","Hypophthalmus oremaculatus",
+  "Hypostomus cochliodon","Hypostomus regani","Hypostomus ternetzi",
+  "Iheringichthys labrosus","Leporinus friderici","Leporinus lacustris",
+  "Loricariichthys platymetopon","Loricariichthys rostratus",
+  "Megalancistrus parananus","Megaleporinus macrocephalus",
+  "Megaleporinus obtusidens","Megaleporinus piavussu",
+  "Metynnis lippincottianus","Oreochromis niloticus",
+  "Piaractus mesopotamicus","Pimelodella avanhandavae",
+  "Pimelodus maculatus","Pimelodus mysteriosus","Pimelodus ornatus",
+  "Pinirampus pirinampu","Plagioscion squamosissimus",
+  "Potamotrygon amandae","Potamotrygon falkneri","Prochilodus lineatus",
+  "Pseudoplatystoma corruscans","Pterodoras granulosus",
+  "Pterygoplichthys ambrosettii","Rhaphiodon vulpinus","Rhinelepis aspera",
+  "Satanoperca setepele","Schizodon altoparanae","Schizodon borellii",
+  "Schizodon nasutus","Serrasalmus maculatus",
+  "Serrasalmus maculatus (preta)","Serrasalmus marginatus",
+  "Sorubim lima","Trachelyopterus galeatus","Traíra",
+  "Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu",
+  "Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata",
+  "Crenicichla saxatilis","Crenicichla saxatilis","Saxatilia britskii","Leporinus trigrinus",
+  "Serrasalmus geryi", "Serrasalmus rhombeus"
+)
+
+replacement_names <- c(
+  "Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré",
+  "Cará","Bananinha","Jeju","Traíra","Traíra","Traíra","Traíra",
+  "Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau",
+  "Cascudo","Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa",
+  "Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado","Corvina",
+  "Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro",
+  "Cascudo","Cará","Piau","Piau","Piau","Piranha","Piranha","Piranha",
+  "Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa",
+  "Bagre Africano","Joaninha","Joaninha","Joaninha","Joaninha","Piau",
+  "Piranha","Piranha"
+)
+
+mapa_estoque <- data.frame(
+  Espécie_original = names_to_replace,
+  estoque = replacement_names,
+  stringsAsFactors = FALSE
+)
+
+# =========================
+# 3) FUNÇÃO DE RATEIO
+# =========================
+fazer_rateio <- function(bio_df, rend_df, nome_saida = "saida") {
+  
+  # composição da biopesca - geral
+  biopesca_comp_geral <- bio_df %>%
+    transmute(
+      Zona,
+      Espécie_original = Espécie
+    ) %>%
+    left_join(mapa_estoque, by = "Espécie_original") %>%
+    filter(!is.na(estoque)) %>%
+    count(estoque, Espécie_original, name = "n_biopesca") %>%
+    group_by(estoque) %>%
+    mutate(
+      total_biopesca_estoque = sum(n_biopesca, na.rm = TRUE),
+      prop_biopesca = n_biopesca / total_biopesca_estoque,
+      perc_biopesca = 100 * prop_biopesca
+    ) %>%
+    ungroup() %>%
+    arrange(estoque, desc(prop_biopesca))
+  
+  # composição da biopesca - por zona
+  biopesca_comp_zona <- bio_df %>%
+    transmute(
+      Zona,
+      Espécie_original = Espécie
+    ) %>%
+    left_join(mapa_estoque, by = "Espécie_original") %>%
+    filter(!is.na(estoque)) %>%
+    count(Zona, estoque, Espécie_original, name = "n_biopesca") %>%
+    group_by(Zona, estoque) %>%
+    mutate(
+      total_biopesca_estoque = sum(n_biopesca, na.rm = TRUE),
+      prop_biopesca = n_biopesca / total_biopesca_estoque,
+      perc_biopesca = 100 * prop_biopesca
+    ) %>%
+    ungroup() %>%
+    arrange(Zona, estoque, desc(prop_biopesca))
+  
+  # rendimento - geral
+  rendimento_geral <- rend_df %>%
+    filter(
+      !is.na(ESPÉCIES),
+      !str_detect(ESPÉCIES, "TOTAL"),
+      ESPÉCIES != "Outros"
+    ) %>%
+    group_by(estoque = ESPÉCIES) %>%
+    summarise(
+      kg_rendimento_total = sum(SEMANATOT, na.rm = TRUE),
+      cpue_estoque_kg_pescador_dia = mean(CPUE.Espécie..kg.pescador.dia., na.rm = TRUE),
+      sd_cpue_estoque = sd(CPUE.Espécie..kg.pescador.dia., na.rm = TRUE),
+      n_registros_rendimento = n(),
+      .groups = "drop"
+    )
+  
+  # rendimento - por zona
+  rendimento_zona <- rend_df %>%
+    filter(
+      !is.na(ESPÉCIES),
+      !str_detect(ESPÉCIES, "TOTAL"),
+      ESPÉCIES != "Outros"
+    ) %>%
+    group_by(Zona = ZONA, estoque = ESPÉCIES) %>%
+    summarise(
+      kg_rendimento_total = sum(SEMANATOT, na.rm = TRUE),
+      cpue_estoque_kg_pescador_dia = mean(CPUE.Espécie..kg.pescador.dia., na.rm = TRUE),
+      sd_cpue_estoque = sd(CPUE.Espécie..kg.pescador.dia., na.rm = TRUE),
+      n_registros_rendimento = n(),
+      .groups = "drop"
+    )
+  
+  # rateio - geral
+  tabela_rateio_geral <- biopesca_comp_geral %>%
+    left_join(rendimento_geral, by = "estoque") %>%
+    mutate(
+      kg_rendimento_rateado = kg_rendimento_total * prop_biopesca,
+      cpue_recalculada_kg_pescador_dia = cpue_estoque_kg_pescador_dia * prop_biopesca
+    ) %>%
+    rename(
+      Estoque = estoque,
+      Espécie = Espécie_original
+    ) %>%
+    select(
+      Estoque,
+      Espécie,
+      n_biopesca,
+      total_biopesca_estoque,
+      prop_biopesca,
+      perc_biopesca,
+      kg_rendimento_total,
+      kg_rendimento_rateado,
+      cpue_estoque_kg_pescador_dia,
+      cpue_recalculada_kg_pescador_dia,
+      sd_cpue_estoque,
+      n_registros_rendimento
+    ) %>%
+    arrange(Estoque, desc(prop_biopesca))
+  
+  # rateio - por zona
+  tabela_rateio_zona <- biopesca_comp_zona %>%
+    left_join(rendimento_zona, by = c("Zona", "estoque")) %>%
+    mutate(
+      kg_rendimento_rateado = kg_rendimento_total * prop_biopesca,
+      cpue_recalculada_kg_pescador_dia = cpue_estoque_kg_pescador_dia * prop_biopesca
+    ) %>%
+    rename(
+      Estoque = estoque,
+      Espécie = Espécie_original
+    ) %>%
+    select(
+      Zona,
+      Estoque,
+      Espécie,
+      n_biopesca,
+      total_biopesca_estoque,
+      prop_biopesca,
+      perc_biopesca,
+      kg_rendimento_total,
+      kg_rendimento_rateado,
+      cpue_estoque_kg_pescador_dia,
+      cpue_recalculada_kg_pescador_dia,
+      sd_cpue_estoque,
+      n_registros_rendimento
+    ) %>%
+    arrange(Zona, Estoque, desc(prop_biopesca))
+  
+  # conferência de match
+  estoques_biopesca_geral <- biopesca_comp_geral %>% distinct(estoque)
+  estoques_rendimento_geral <- rendimento_geral %>% distinct(estoque)
+  
+  sem_match_rend <- anti_join(
+    estoques_biopesca_geral,
+    estoques_rendimento_geral,
+    by = "estoque"
+  )
+  
+  sem_match_bio <- anti_join(
+    estoques_rendimento_geral,
+    estoques_biopesca_geral,
+    by = "estoque"
+  )
+  
+  write.xlsx(
+    list(
+      biopesca_geral   = biopesca_comp_geral,
+      rendimento_geral = rendimento_geral,
+      rateio_geral     = tabela_rateio_geral,
+      biopesca_zona    = biopesca_comp_zona,
+      rendimento_zona  = rendimento_zona,
+      rateio_zona      = tabela_rateio_zona,
+      sem_match_rend   = sem_match_rend,
+      sem_match_bio    = sem_match_bio
+    ),
+    file = paste0("Rateio_", nome_saida, ".xlsx"),
+    overwrite = TRUE
+  )
+  
+  list(
+    biopesca_comp_geral = biopesca_comp_geral,
+    rendimento_geral = rendimento_geral,
+    tabela_rateio_geral = tabela_rateio_geral,
+    biopesca_comp_zona = biopesca_comp_zona,
+    rendimento_zona = rendimento_zona,
+    tabela_rateio_zona = tabela_rateio_zona
+  )
+}
+
+# =========================
+# 4) BASE GERAL (sem Montante)
+# =========================
+Bio_geral <- BioAnual23 %>%
+  filter(tolower(Zona) != "montante")
+
+Rend_geral <- rendimento_geral_base
+
+res_geral <- fazer_rateio(
+  bio_df = Bio_geral,
+  rend_df = Rend_geral,
+  nome_saida = "geral_sem_montante"
+)
+
+# =========================
+# 5) MONTANTE
+# =========================
+Bio_montante <- BioAnual23 %>%
+  filter(tolower(Zona) == "montante")
+
+Rend_montante <- rendimento_montante_base %>%
+  mutate(ZONA = "Montante")
+
+res_montante <- fazer_rateio(
+  bio_df = Bio_montante,
+  rend_df = Rend_montante,
+  nome_saida = "montante"
+)
+
+# =========================
+# 6) OPCIONAL: TUDO JUNTO
+# =========================
+Bio_todas <- BioAnual23
+
+Rend_todas <- bind_rows(
+  rendimento_geral_base,
+  rendimento_montante_base %>% mutate(ZONA = "Montante")
+)
+
+res_todas <- fazer_rateio(
+  bio_df = Bio_todas,
+  rend_df = Rend_todas,
+  nome_saida = "todas_as_zonas"
+)
+
+# =========================
+# 7) CHECAGEM RÁPIDA
+# =========================
+head(res_montante$tabela_rateio_geral)
+head(res_montante$tabela_rateio_zona)
