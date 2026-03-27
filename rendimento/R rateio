@@ -80,7 +80,8 @@ names_to_replace <- c(
   "Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu",
   "Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata",
   "Crenicichla saxatilis","Crenicichla saxatilis","Saxatilia britskii",
-  "Serrasalmus geryi","Serrasalmus rhombeus","Leporinus tigrinus","Brycon orbignyanus"
+  "Serrasalmus geryi","Serrasalmus rhombeus","Leporinus tigrinus","Brycon orbignyanus",
+  "Leporinus unitaeniatus","Megalonema platanum"
 )
 
 replacement_names <- c(
@@ -93,7 +94,7 @@ replacement_names <- c(
   "Cascudo","Cará","Piau","Piau","Piau","Piranha","Piranha","Piranha",
   "Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa",
   "Bagre Africano","Joaninha","Joaninha","Joaninha","Joaninha",
-  "Piranha","Piranha","Piau","Piracanjuba"
+  "Piranha","Piranha","Piau","Piracanjuba","Piau","Mandi"
 )
 
 mapa_estoque <- data.frame(
