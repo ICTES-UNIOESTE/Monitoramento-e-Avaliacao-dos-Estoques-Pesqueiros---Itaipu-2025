@@ -79,21 +79,21 @@ names_to_replace <- c(
   "Sorubim lima","Trachelyopterus galeatus","Traíra",
   "Hemisorubim platyrhynchos","Salminus brasiliensis","Zungaro jahu",
   "Cyprinus carpio","Clarias gariepinus","Crenicichla semifasciata",
-  "Crenicichla saxatilis","Crenicichla saxatilis","Saxatilia britskii","Leporinus trigrinus",
-  "Serrasalmus geryi", "Serrasalmus rhombeus"
+  "Crenicichla saxatilis","Crenicichla saxatilis","Saxatilia britskii",
+  "Serrasalmus geryi","Serrasalmus rhombeus","Leporinus tigrinus","Brycon orbignyanus"
 )
 
 replacement_names <- c(
-  "Bocudo","Bocudo","Apaiari","Luz Baixa","Linguado","Tucunaré","Tucunaré",
+  "Bocudo","Bocudo","Apaiari","Luz baixa","Linguado","Tucunaré","Tucunaré",
   "Cará","Bananinha","Jeju","Traíra","Traíra","Traíra","Traíra",
-  "Perna de Moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau",
+  "Perna de moça","Cascudo","Cascudo","Cascudo","Mandi","Piau","Piau",
   "Cascudo","Cascudo","Cascudo","Piauçu","Piapara","Piapara","Palometa",
   "Tilápia","Pacu","Mandi","Mandi","Mandi","Mandi","Barbado","Corvina",
   "Raia","Raia","Curimba","Pintado","Armado","Cascudo","Dourado Cachorro",
   "Cascudo","Cará","Piau","Piau","Piau","Piranha","Piranha","Piranha",
   "Jurupensem","Cangati","Traíra","Jurupoca","Dourado","Jaú","Carpa",
-  "Bagre Africano","Joaninha","Joaninha","Joaninha","Joaninha","Piau",
-  "Piranha","Piranha"
+  "Bagre Africano","Joaninha","Joaninha","Joaninha","Joaninha",
+  "Piranha","Piranha","Piau","Piracanjuba"
 )
 
 mapa_estoque <- data.frame(
