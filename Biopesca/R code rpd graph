@@ -1,92 +1,227 @@
 # ============================================================
 # Reprodução — gráficos empilhados (Geral, Zonas e Espécies)
-# Reprodução #####
+# ============================================================
+
 # Pasta de saída
-setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025")
+setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025")
+
 library(readxl)
-library(vegan)
 library(tidyr)
 library(dplyr)
 library(ggplot2)
 library(openxlsx)
-BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet="2025"))
+
+BioAnual23 <- data.frame(read_xlsx("Biopesca_2025_ANUAL.xlsx", sheet = "2025"))
+
+# Excluir Montante
 BioAnual23 <- BioAnual23 %>%
   filter(tolower(Zona) != "montante")
-out_dir <- "C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025/reprodutivos"
+
+out_dir <- "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R biopesca/Anual 2025/reprodutivos"
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-library(dplyr)
-library(tidyr)
-library(ggplot2)
+# ------------------------------------------------------------
+# Configurações gerais
+# ------------------------------------------------------------
 
-# ---------------------------------------------
-# Preparação do dataset (Mês/Ano + Estágio)
-# ---------------------------------------------
-month_order <- c("Mar 2025", "Apr 2025", "May 2025", "Jun 2025",
-                 "Jul 2025", "Aug 2025", "Sep 2025", "Oct 2025")
+mes_lbl <- c("Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+             "Jul", "Ago", "Set", "Out", "Nov", "Dez")
+
+month_order <- c("Mar 2025", "Abr 2025", "Mai 2025", "Jun 2025",
+                 "Jul 2025", "Ago 2025", "Set 2025", "Out 2025")
 
 stage_levels <- c("IMT", "MAT", "RPD", "ESG", "REG")
 
-rep_data <- BioAnual23 %>%
-  mutate(
-    Data = as.Date(Data),
-    
-    # month label not dependent on locale
-    Mes = paste0(month.abb[as.integer(format(Data, "%m"))], " ", format(Data, "%Y")),
-    
-    # clean stage
-    Estagio = trimws(toupper(as.character(Estagio))),
-    Estagio = na_if(Estagio, "")   # ✅ empty string becomes NA
-  ) %>%
-  mutate(
-    Mes     = factor(Mes, levels = month_order),
-    Estagio = factor(Estagio, levels = stage_levels)
-  ) %>%
-  # ✅ remove anything that will not be plotted
-  filter(!is.na(Mes), !is.na(Estagio))
+# Cores fixas dos estágios
+stage_colors <- c(
+  "IMT" = "#4D4D4D",  # cinza escuro
+  "MAT" = "#E69F00",  # laranja
+  "RPD" = "#D55E00",  # vermelho-alaranjado
+  "ESG" = "#0072B2",  # azul
+  "REG" = "#009E73"   # verde
+)
+
+# Tamanhos
+title_size       <- 26
+axis_title_size  <- 20
+axis_text_size   <- 16
+legend_title_size <- 18
+legend_text_size  <- 15
+
+# ------------------------------------------------------------
+# Funções auxiliares
+# ------------------------------------------------------------
+
+parse_data_biopesca <- function(x) {
+  if (inherits(x, "Date")) return(x)
+  if (inherits(x, "POSIXct") || inherits(x, "POSIXt")) return(as.Date(x))
+  
+  if (is.numeric(x)) {
+    return(as.Date(x, origin = "1899-12-30"))
+  }
+  
+  x <- as.character(x)
+  x <- trimws(x)
+  x[x == ""] <- NA
+  
+  d1 <- suppressWarnings(as.Date(x))
+  
+  idx1 <- is.na(d1) & !is.na(x)
+  if (any(idx1)) {
+    d1[idx1] <- suppressWarnings(as.Date(x[idx1], format = "%m/%d/%Y"))
+  }
+  
+  idx2 <- is.na(d1) & !is.na(x)
+  if (any(idx2)) {
+    d1[idx2] <- suppressWarnings(as.Date(x[idx2], format = "%d/%m/%Y"))
+  }
+  
+  d1
+}
+
+species_title_full <- function(x) {
+  x <- trimws(as.character(x))
+  x <- gsub("_", " ", x)
+  x <- gsub("\\s+", " ", x)
+  x
+}
+
+safe_filename <- function(x) {
+  x_safe <- iconv(x, to = "ASCII//TRANSLIT")
+  if (is.na(x_safe)) x_safe <- x
+  x_safe <- gsub("[^A-Za-z0-9_ -]+", "", x_safe)
+  x_safe <- gsub(" +", "_", x_safe)
+  x_safe <- gsub("_+", "_", x_safe)
+  x_safe <- gsub("^_|_$", "", x_safe)
+  if (nchar(x_safe) == 0) x_safe <- "sem_nome"
+  x_safe
+}
 
 make_month_stage_percent <- function(df) {
-  df %>%
+  base <- df %>%
     count(Mes, Estagio, name = "n") %>%
     complete(
       Mes = factor(month_order, levels = month_order),
       Estagio = factor(stage_levels, levels = stage_levels),
       fill = list(n = 0)
-    ) %>%
+    )
+  
+  totais <- base %>%
     group_by(Mes) %>%
-    mutate(pct = if (sum(n) > 0) 100 * n / sum(n) else 0) %>%
-    ungroup() %>%
+    summarise(total_mes = sum(n), .groups = "drop")
+  
+  base %>%
+    left_join(totais, by = "Mes") %>%
+    mutate(
+      pct = ifelse(total_mes > 0, 100 * n / total_mes, 0)
+    ) %>%
     arrange(Mes, Estagio)
 }
 
-plot_month_stage_stack <- function(tab, titulo = "", italic_title = FALSE) {
+tab_geral <- make_month_stage_percent(rep_data)
+
+tab_geral %>%
+  group_by(Mes) %>%
+  summarise(soma_pct = sum(pct), total = sum(n))
+
+plot_month_stage_stack <- function(tab,
+                                   titulo = "",
+                                   italic_title = FALSE,
+                                   title_hjust = 0.5) {
+  
   ggplot(tab, aes(x = Mes, y = pct, fill = Estagio)) +
     geom_col(width = 0.8) +
-    labs(title = titulo, x = NULL, y = "Percentual de registros (%)", fill = "Estágio") +
-    theme_minimal() +
+    labs(
+      title = titulo,
+      x = "Mês",
+      y = "Percentual de registros (%)",
+      fill = "Estágio"
+    ) +
+    scale_fill_manual(
+      values = stage_colors,
+      limits = stage_levels,
+      breaks = stage_levels,
+      drop = FALSE
+    ) +
+    scale_y_continuous(
+      breaks = seq(0, 100, 10),
+      limits = c(0, 100),
+      expand = c(0, 0)
+    ) +
+    coord_cartesian(ylim = c(0, 100)) +
+    theme_minimal(base_size = 14) +
     theme(
       panel.grid.major = element_blank(),
       panel.grid.minor = element_blank(),
       axis.line.x = element_line(color = "black", linewidth = 1),
       axis.line.y = element_line(color = "black", linewidth = 1),
-      plot.title = element_text(size = 24, face = ifelse(italic_title, "italic", "plain")),
+      
+      axis.title.x = element_text(size = axis_title_size, face = "plain"),
+      axis.title.y = element_text(size = axis_title_size, face = "plain"),
+      axis.text.x  = element_text(size = axis_text_size, angle = 0, vjust = 0.5),
+      axis.text.y  = element_text(size = axis_text_size),
+      
+      legend.title = element_text(size = legend_title_size),
+      legend.text  = element_text(size = legend_text_size),
+      
+      plot.title = element_text(
+        size = title_size,
+        face = ifelse(italic_title, "italic", "plain"),
+        hjust = title_hjust
+      ),
+      plot.title.position = "plot",
+      
       plot.background  = element_rect(fill = "white", color = NA),
-      panel.background = element_rect(fill = "white", color = NA)
-    ) +
-    scale_fill_discrete(limits = stage_levels, breaks = stage_levels) +
-    scale_y_continuous(breaks = seq(0, 100, 10)) +
-    coord_cartesian(ylim = c(0, 100))   # ✅ avoids “Removed rows…” warnings
+      panel.background = element_rect(fill = "white", color = NA),
+      
+      plot.margin = margin(t = 10, r = 25, b = 10, l = 10)
+    )
 }
 
+# ------------------------------------------------------------
+# Preparação do dataset
+# ------------------------------------------------------------
+
+# ------------------------------------------------------------
+# Preparação do dataset
+# ------------------------------------------------------------
+
+rep_data <- BioAnual23 %>%
+  mutate(
+    Data = parse_data_biopesca(Data),
+    mes_num = as.integer(format(Data, "%m")),
+    ano_num = format(Data, "%Y"),
+    Mes = paste0(mes_lbl[mes_num], " ", ano_num),
+    
+    Estagio = trimws(toupper(as.character(Estagio))),
+    Estagio = na_if(Estagio, "")
+  ) %>%
+  mutate(
+    # recodifique aqui se houver variantes
+    Estagio = case_when(
+      Estagio %in% c("IMT") ~ "IMT",
+      Estagio %in% c("MAT") ~ "MAT",
+      Estagio %in% c("RPD") ~ "RPD",
+      Estagio %in% c("ESG") ~ "ESG",
+      Estagio %in% c("REG") ~ "REG",
+      TRUE ~ NA_character_
+    ),
+    Mes = factor(Mes, levels = month_order),
+    Estagio = factor(Estagio, levels = stage_levels)
+  ) %>%
+  filter(!is.na(Mes), !is.na(Estagio))
+
 # ============================================================
-# 1) GERAL (todas as espécies) — GRÁFICO
+# 1) GERAL
 # ============================================================
+
 tab_geral <- make_month_stage_percent(rep_data)
 
 p_geral <- plot_month_stage_stack(
   tab_geral,
-  titulo = "Estágios reprodutivos por mês - Geral",
-  italic_title = FALSE
+  titulo = "Geral",
+  italic_title = FALSE,
+  title_hjust = 0.96
 )
 
 ggsave(
@@ -97,29 +232,26 @@ ggsave(
 )
 
 # ============================================================
-# 2) POR ZONA (Lacustre, Transição, Fluvial) — GRÁFICOS
+# 2) POR ZONA
 # ============================================================
+
 zonas <- c("Lacustre", "Transição", "Fluvial")
 
 for (z in zonas) {
   
-  df_z <- rep_data %>% filter(Zona == z)
+  df_z <- rep_data %>%
+    filter(Zona == z)
   
   tab_z <- make_month_stage_percent(df_z)
   
   p_z <- plot_month_stage_stack(
     tab_z,
-    titulo = paste0("Estágios reprodutivos por mês - ", z),
-    italic_title = FALSE
+    titulo = z,
+    italic_title = FALSE,
+    title_hjust = 0.96
   )
   
-  # nome seguro p/ arquivo
-  z_safe <- iconv(z, to = "ASCII//TRANSLIT")
-  if (is.na(z_safe)) z_safe <- z
-  z_safe <- gsub("[^A-Za-z0-9_ -]+", "", z_safe)
-  z_safe <- gsub(" +", "_", z_safe)
-  z_safe <- gsub("_+", "_", z_safe)
-  z_safe <- gsub("^_|_$", "", z_safe)
+  z_safe <- safe_filename(z)
   
   ggsave(
     filename = file.path(out_dir, paste0("Reprodutivos_por_mes_", toupper(z_safe), ".png")),
@@ -130,30 +262,25 @@ for (z in zonas) {
 }
 
 # ============================================================
-# 3) POR ESPÉCIE (apenas GRÁFICO por espécie)
-# título: itálico, com NOME COMPLETO "Gênero espécie"
+# 3) POR ESPÉCIE
 # ============================================================
+
 species_list <- sort(unique(rep_data$Espécie))
 
 for (sp in species_list) {
   
-  df_sp <- rep_data %>% filter(Espécie == sp)
+  df_sp <- rep_data %>%
+    filter(Espécie == sp)
   
   tab_sp <- make_month_stage_percent(df_sp)
   
-  # nome seguro p/ arquivo
-  sp_safe <- iconv(sp, to = "ASCII//TRANSLIT")
-  if (is.na(sp_safe)) sp_safe <- sp
-  sp_safe <- gsub("[^A-Za-z0-9_ -]+", "", sp_safe)
-  sp_safe <- gsub(" +", "_", sp_safe)
-  sp_safe <- gsub("_+", "_", sp_safe)
-  sp_safe <- gsub("^_|_$", "", sp_safe)
-  if (nchar(sp_safe) == 0) sp_safe <- "Especie_sem_nome"
+  sp_safe <- safe_filename(sp)
   
   p_sp <- plot_month_stage_stack(
     tab_sp,
     titulo = species_title_full(sp),
-    italic_title = TRUE
+    italic_title = TRUE,
+    title_hjust = 0.5
   )
   
   ggsave(
