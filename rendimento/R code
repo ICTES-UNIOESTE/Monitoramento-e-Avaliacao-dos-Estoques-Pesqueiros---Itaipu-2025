@@ -13,8 +13,86 @@ rendimento <- data.frame(read_xlsx("Rendimento 2025 Anual RES.xlsx", sheet="Banc
 rendimento$DATA <-as.Date(rendimento$DATA, format = "%d/%m/%Y") # Data em (mmm aaaa)
 rendimento$Seq <- seq(nrow(rendimento))
 
+# 1) Garantir numéricos -----------------------------------------------------
+
+rendimento <- rendimento %>%
+  mutate(
+    SEMANATOT_num = suppressWarnings(as.numeric(SEMANATOT)),
+    DIASTOT_num   = suppressWarnings(as.numeric(DIASTOT))
+  )
+
+# 2) Limpeza básica ---------------------------------------------------------
+
+cpue_clean <- rendimento %>%
+  filter(
+    !grepl("TOTAL", ESPÉCIES, ignore.case = TRUE),
+    ESPÉCIES != "Outros",
+    !is.na(SEMANATOT_num),
+    !is.na(DIASTOT_num),
+    DIASTOT_num > 0
+  )
+
+# 3) CPUE por pescador x zona x mês ----------------------------------------
+# usa 1 único valor de esforço por pescador-zona-mês
+
+cpue_pescador_mes_zona <- cpue_clean %>%
+  group_by(PESCADOR_COD, ZONA, MÊS) %>%
+  summarise(
+    peso_total_kg = sum(SEMANATOT_num, na.rm = TRUE),
+    esforco_dias  = dplyr::first(DIASTOT_num),
+    CPUE_total    = peso_total_kg / esforco_dias,
+    .groups       = "drop"
+  )
+
+# 4) Resumo por região ------------------------------------------------------
+
+cpue_regioes <- cpue_pescador_mes_zona %>%
+  group_by(ZONA) %>%
+  summarise(
+    mean_CPUE    = mean(CPUE_total, na.rm = TRUE),
+    sd_CPUE      = sd(CPUE_total, na.rm = TRUE),
+    N_obs        = n(),                         # nº de observações pescador×zona×mês
+    N_pescadores = n_distinct(PESCADOR_COD),   # nº de pescadores distintos
+    .groups      = "drop"
+  )
+
+# 5) CPUE GERAL (independente das zonas) -----------------------------------
+# aqui o agrupamento é só pescador x mês
+
+cpue_pescador_mes_geral <- cpue_clean %>%
+  group_by(PESCADOR_COD, MÊS) %>%
+  summarise(
+    peso_total_kg = sum(SEMANATOT_num, na.rm = TRUE),
+    esforco_dias  = dplyr::first(DIASTOT_num),
+    CPUE_total    = peso_total_kg / esforco_dias,
+    .groups       = "drop"
+  )
+
+cpue_geral <- cpue_pescador_mes_geral %>%
+  summarise(
+    ZONA         = "Geral",
+    mean_CPUE    = mean(CPUE_total, na.rm = TRUE),
+    sd_CPUE      = sd(CPUE_total, na.rm = TRUE),
+    N_obs        = n(),                        # nº de observações pescador×mês
+    N_pescadores = n_distinct(PESCADOR_COD)
+  )
+
+# 6) Tabela final -----------------------------------------------------------
+
+cpue_resumo <- bind_rows(cpue_regioes, cpue_geral)
+cpue_resumo
+
+write.xlsx(
+  cpue_resumo,
+  file = "CPUE_media_sd_por_regiao_por_pescador_Reservatorio.xlsx",
+  rowNames = FALSE
+)
+
 #
 nspp<- aggregate(Seq ~ ESPÉCIES+CPUE.Espécie..kg.pescador.dia., data=rendimento, length)
+
+
+
 
 # Remove rows with NA or infinite values
 data <- na.omit(nspp[is.finite(nspp$CPUE.Espécie..kg.pescador.dia.), ])
