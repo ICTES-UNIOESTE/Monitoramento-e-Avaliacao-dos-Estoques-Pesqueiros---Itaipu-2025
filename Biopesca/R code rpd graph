@@ -98,31 +98,29 @@ safe_filename <- function(x) {
 }
 
 make_month_stage_percent <- function(df) {
-  base <- df %>%
+  
+  df %>%
+    # segurança extra: só trabalha com o que realmente entra no plot
+    filter(!is.na(Mes), !is.na(Estagio),
+           Mes %in% month_order,
+           Estagio %in% stage_levels) %>%
     count(Mes, Estagio, name = "n") %>%
     complete(
       Mes = factor(month_order, levels = month_order),
       Estagio = factor(stage_levels, levels = stage_levels),
       fill = list(n = 0)
-    )
-  
-  totais <- base %>%
-    group_by(Mes) %>%
-    summarise(total_mes = sum(n), .groups = "drop")
-  
-  base %>%
-    left_join(totais, by = "Mes") %>%
-    mutate(
-      pct = ifelse(total_mes > 0, 100 * n / total_mes, 0)
     ) %>%
+    group_by(Mes) %>%
+    mutate(
+      total_mes = sum(n),
+      pct = if_else(total_mes > 0, 100 * n / total_mes, 0),
+      pct = pmax(0, pmin(100, pct))  # evita 100.0000001 etc.
+    ) %>%
+    ungroup() %>%
     arrange(Mes, Estagio)
 }
 
-tab_geral <- make_month_stage_percent(rep_data)
 
-tab_geral %>%
-  group_by(Mes) %>%
-  summarise(soma_pct = sum(pct), total = sum(n))
 
 plot_month_stage_stack <- function(tab,
                                    titulo = "",
@@ -145,7 +143,6 @@ plot_month_stage_stack <- function(tab,
     ) +
     scale_y_continuous(
       breaks = seq(0, 100, 10),
-      limits = c(0, 100),
       expand = c(0, 0)
     ) +
     coord_cartesian(ylim = c(0, 100)) +
@@ -290,4 +287,3 @@ for (sp in species_list) {
     bg = "white"
   )
 }
-
