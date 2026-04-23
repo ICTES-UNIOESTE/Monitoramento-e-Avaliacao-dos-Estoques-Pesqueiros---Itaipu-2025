@@ -1166,6 +1166,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 04 Número de dependentes
+  # 04 Número de dependentes
   col_dep <- "Quantas.pessoas.dependem.da.sua.renda."
   if (col_dep %in% names(df_socio)) {
     base_dep <- df_com_localidade(df_socio, include_geral = include_geral) %>%
@@ -1186,9 +1187,13 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
       ) %>%
       filter(!is.na(categoria))
     
+    ordem_dep <- c("0", "1", "2", "3", "4", "5", ">=6")
+    pal_dep <- stats::setNames(paleta_categorica_10[1:7], ordem_dep)
+    
     tab_dep <- base_dep %>%
       group_by(Localidade, categoria) %>%
-      summarise(valor = dplyr::n_distinct(Nome.Completo), .groups = "drop")
+      summarise(valor = dplyr::n_distinct(Nome.Completo), .groups = "drop") %>%
+      mutate(categoria = factor(as.character(categoria), levels = ordem_dep))
     
     salvar_tabela_percentual(
       tab_dep,
@@ -1197,10 +1202,6 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
       coluna_valor = "valor",
       nome_categoria_saida = "Numero_de_dependentes"
     )
-    
-    ordem_dep <- c("0", "1", "2", "3", "4", "5", ">=6")
-    pal_dep <- stats::setNames(paleta_categorica_10[1:7], ordem_dep)
-    tab_dep$categoria <- factor(tab_dep$categoria, levels = ordem_dep)
     
     n_dep_fun <- function(local, incl) {
       base <- if (local == "Geral" && incl) df_socio else df_socio %>% filter(Zona.de.Pesca == local)
@@ -1219,28 +1220,64 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
     n_montante <- if (!include_geral) n_dep_fun("Montante", FALSE) else NULL
     
     if (include_geral) {
-      painel_pizza_3zonas_n(
-        tab_dep,
-        titulo_painel = "Número de dependentes",
-        nome_arquivo = "04_numero_de_dependentes.png",
+      p_geral <- fazer_plot_pizza(
+        tab_dep %>% filter(Localidade == "Geral"),
         paleta = pal_dep,
-        nome_legenda = "Número de dependentes",
-        n_geral = n_geral,
-        n_fluvial = n_fluvial,
-        n_transicao = n_transicao,
-        n_lacustre = n_lacustre,
-        texto_n = "Número total de registros de pescadores"
+        titulo_local = "Geral",
+        subtitulo_local = subtitulo_n(n_geral, "Número total de registros de pescadores"),
+        mostrar_localidade = TRUE,
+        nome_legenda = "Número de dependentes"
       )
+      
+      p_fluvial <- fazer_plot_pizza(
+        tab_dep %>% filter(Localidade == "Fluvial"),
+        paleta = pal_dep,
+        titulo_local = "Fluvial",
+        subtitulo_local = subtitulo_n(n_fluvial, "Número total de registros de pescadores"),
+        mostrar_localidade = TRUE,
+        nome_legenda = "Número de dependentes"
+      )
+      
+      p_transicao <- fazer_plot_pizza(
+        tab_dep %>% filter(Localidade == "Transição"),
+        paleta = pal_dep,
+        titulo_local = "Transição",
+        subtitulo_local = subtitulo_n(n_transicao, "Número total de registros de pescadores"),
+        mostrar_localidade = TRUE,
+        nome_legenda = "Número de dependentes"
+      )
+      
+      p_lacustre <- fazer_plot_pizza(
+        tab_dep %>% filter(Localidade == "Lacustre"),
+        paleta = pal_dep,
+        titulo_local = "Lacustre",
+        subtitulo_local = subtitulo_n(n_lacustre, "Número total de registros de pescadores"),
+        mostrar_localidade = TRUE,
+        nome_legenda = "Número de dependentes"
+      )
+      
+      painel <- criar_painel_2x2(
+        plot_geral = p_geral,
+        plot_fluvial = p_fluvial,
+        plot_transicao = p_transicao,
+        plot_lacustre = p_lacustre,
+        titulo_painel = "Número de dependentes"
+      )
+      
+      salvar_png(painel, "04_numero_de_dependentes.png", 1000, 1000)
+      
     } else {
-      painel_pizza_montante_n(
-        tab_dep,
-        titulo_painel = "Número de dependentes",
-        nome_arquivo = "04_numero_de_dependentes.png",
+      p <- fazer_plot_pizza(
+        tab_dep %>% filter(Localidade == "Montante"),
         paleta = pal_dep,
-        nome_legenda = "Número de dependentes",
-        n_montante = n_montante,
-        texto_n = "Número total de registros de pescadores"
+        titulo_local = NULL,
+        subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+        mostrar_localidade = FALSE,
+        nome_legenda = "Número de dependentes"
       )
+      
+      fig <- criar_figura_unica_montante(p, "Número de dependentes")
+      salvar_png(fig, "04_numero_de_dependentes.png", 1000, 1000)
     }
   }
   
