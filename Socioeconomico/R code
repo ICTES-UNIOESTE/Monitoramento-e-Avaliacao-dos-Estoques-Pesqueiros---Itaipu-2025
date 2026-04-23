@@ -1,0 +1,1990 @@
+############################################################
+# RELATÓRIO SOCIOECONÔMICO 2025 - ITAIPU
+# PAINÉIS 2x2 PARA GERAL + FLUVIAL + TRANSIÇÃO + LACUSTRE
+# MONTANTE EM FIGURA ÚNICA
+# COM TABELAS DE % PARA CONFERÊNCIA
+############################################################
+
+rm(list = ls())
+
+#===========================================================
+# 1) DIRETÓRIO E PACOTES
+#===========================================================
+setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(openxlsx)
+library(lubridate)
+library(Cairo)
+library(stringr)
+library(scales)
+library(patchwork)
+library(forcats)
+
+#===========================================================
+# 2) ARQUIVO BASE
+#===========================================================
+arquivo_base <- "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL.xlsx"
+
+#===========================================================
+# 3) LEITURA DAS PLANILHAS
+#===========================================================
+socio_raw <- data.frame(
+  read_xlsx(arquivo_base, sheet = "cadastro")
+)
+
+redes_raw <- data.frame(
+  read_xlsx(arquivo_base, sheet = "Redes")
+)
+
+anzois_raw <- data.frame(
+  read_xlsx(arquivo_base, sheet = "Espinhel")
+)
+
+#===========================================================
+# 4) PREPARO INICIAL
+#===========================================================
+socio_raw <- socio_raw %>%
+  mutate(Seq = seq_len(n()))
+
+if ("Ano.de.referência" %in% names(socio_raw)) {
+  socio_raw <- socio_raw %>%
+    filter(Ano.de.referência == "2025" | Ano.de.referência == 2025)
+}
+
+if ("Data.de.nascimento" %in% names(socio_raw)) {
+  socio_raw$Data.de.nascimento <- as.Date(socio_raw$Data.de.nascimento, format = "%d/%m/%Y")
+}
+
+ordem_3zonas <- c("Fluvial", "Transição", "Lacustre")
+
+socio_3zonas <- socio_raw %>%
+  filter(Zona.de.Pesca %in% ordem_3zonas) %>%
+  mutate(Zona.de.Pesca = factor(Zona.de.Pesca, levels = ordem_3zonas))
+
+socio_montante <- socio_raw %>%
+  filter(Zona.de.Pesca == "Montante") %>%
+  mutate(Zona.de.Pesca = factor(Zona.de.Pesca, levels = "Montante"))
+
+#===========================================================
+# 5) CORES
+#===========================================================
+cores_zona <- c(
+  "Fluvial"   = "#045e9a",
+  "Transição" = "#da2420",
+  "Lacustre"  = "#009241",
+  "Montante"  = "#bebebe"
+)
+
+cores_estrutura <- c(
+  "Geral"     = "#ffff00",
+  "Fluvial"   = "#045e9a",
+  "Transição" = "#da2420",
+  "Lacustre"  = "#009241",
+  "Montante"  = "#bebebe"
+)
+
+cores_sexo <- c(
+  "Masculino" = "#377eb8",
+  "Feminino"  = "#e41a1c"
+)
+
+cores_ajudantes_bin <- c(
+  "Sim" = "#377eb8",
+  "Não" = "#e41a1c"
+)
+
+paleta_categorica_10 <- c(
+  "#377eb8",
+           "#e41a1c",
+           "#4daf4a",
+           "#984ea3",
+           "#ff7f00",
+           "#ffff33",
+           "#a65628",
+           "#f781bf",
+           "#999999",
+           "#66c2a5",
+           "#440154"
+)
+
+#===========================================================
+# 6) TEMAS E FUNÇÕES AUXILIARES
+#===========================================================
+tema_pizza <- theme_void() +
+  theme(
+    legend.position = "right",
+    legend.justification = "bottom",
+    legend.box.just = "right",
+    legend.direction = "vertical",
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(t = 2, b = 4))
+  )
+
+tema_barra <- theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line.x = element_line(color = "black", linewidth = 0.6),
+    axis.line.y = element_line(color = "black", linewidth = 0.6),
+    axis.text.x = element_text(size = 13),
+    axis.text.y = element_text(size = 13),
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15),
+    plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(t = 2, b = 4)),
+    legend.position = "right",
+    legend.justification = "bottom",
+    legend.box.just = "right",
+    legend.direction = "vertical",
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+
+tema_box <- theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(size = 13),
+    axis.text.y = element_text(size = 13),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 15),
+    plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(t = 2, b = 4)),
+    legend.position = "right",
+    legend.justification = "bottom",
+    legend.box.just = "right",
+    legend.direction = "vertical",
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 16, face = "bold")
+  )
+
+salvar_png <- function(plot_obj, nome_arquivo, width = 1000, height = 1000) {
+  CairoPNG(nome_arquivo, width = width, height = height)
+  print(plot_obj)
+  dev.off()
+}
+
+subtitulo_n <- function(n, texto_base = "N") {
+  paste0(texto_base, " = ", format(n, big.mark = ".", decimal.mark = ","))
+}
+
+n_localidade <- function(df, localidade, include_geral = TRUE, distinct_nome = TRUE) {
+  if (localidade == "Geral" && include_geral) {
+    if (distinct_nome) return(dplyr::n_distinct(df$Nome.Completo))
+    return(nrow(df))
+  }
+  
+  df_loc <- df %>% filter(Zona.de.Pesca == localidade)
+  
+  if (distinct_nome) {
+    dplyr::n_distinct(df_loc$Nome.Completo)
+  } else {
+    nrow(df_loc)
+  }
+}
+
+n_valido_simples <- function(df, coluna, localidade, include_geral = TRUE, distinct_nome = TRUE) {
+  if (localidade == "Geral" && include_geral) {
+    base <- df
+  } else {
+    base <- df %>% filter(Zona.de.Pesca == localidade)
+  }
+  
+  base <- base %>%
+    filter(!is.na(.data[[coluna]]), .data[[coluna]] != "")
+  
+  if (distinct_nome) {
+    dplyr::n_distinct(base$Nome.Completo)
+  } else {
+    nrow(base)
+  }
+}
+
+n_valido_multiresposta <- function(df, coluna, localidade, include_geral = TRUE,
+                                   excluir_padrao = NULL) {
+  if (localidade == "Geral" && include_geral) {
+    base <- df
+  } else {
+    base <- df %>% filter(Zona.de.Pesca == localidade)
+  }
+  
+  base <- base %>%
+    filter(!is.na(.data[[coluna]]), .data[[coluna]] != "")
+  
+  if (!is.null(excluir_padrao)) {
+    base <- base %>%
+      filter(!grepl(excluir_padrao, .data[[coluna]], ignore.case = TRUE))
+  }
+  
+  base <- base %>%
+    separate_rows(.data[[coluna]], sep = ",") %>%
+    mutate(valor_limpo = str_trim(.data[[coluna]])) %>%
+    filter(valor_limpo != "")
+  
+  nrow(base)
+}
+
+n_valido_classes <- function(df, coluna, localidade, include_geral = TRUE,
+                             breaks, labels, distinct_nome = TRUE) {
+  if (localidade == "Geral" && include_geral) {
+    base <- df
+  } else {
+    base <- df %>% filter(Zona.de.Pesca == localidade)
+  }
+  
+  base <- base %>%
+    filter(!is.na(.data[[coluna]])) %>%
+    mutate(classe = cut(.data[[coluna]], breaks = breaks, labels = labels, right = FALSE)) %>%
+    filter(!is.na(classe))
+  
+  if (distinct_nome) {
+    dplyr::n_distinct(base$Nome.Completo)
+  } else {
+    nrow(base)
+  }
+}
+
+paleta_alfabetica <- function(categorias) {
+  categorias <- sort(unique(as.character(categorias)))
+  categorias <- categorias[!is.na(categorias)]
+  
+  if (length(categorias) == 0) return(NULL)
+  
+  cores <- paleta_categorica_10
+  if (length(categorias) > length(cores)) {
+    cores <- rep(cores, length.out = length(categorias))
+  } else {
+    cores <- cores[seq_along(categorias)]
+  }
+  
+  stats::setNames(cores, categorias)
+}
+
+paleta_por_ordem <- function(ordem_categorias) {
+  n_cat <- length(ordem_categorias)
+  
+  if (n_cat == 0) return(NULL)
+  
+  cores <- paleta_categorica_10
+  if (n_cat > length(cores)) {
+    cores <- rep(cores, length.out = n_cat)
+  } else {
+    cores <- cores[seq_len(n_cat)]
+  }
+  
+  stats::setNames(cores, ordem_categorias)
+}
+
+localidade_titulo <- function(localidade, mostrar_localidade = TRUE) {
+  if (!mostrar_localidade) return(NULL)
+  localidade
+}
+
+design_2x2 <- "
+AC
+BD
+"
+
+criar_painel_2x2 <- function(plot_geral, plot_fluvial, plot_transicao, plot_lacustre,
+                             titulo_painel, mostrar_legenda = TRUE) {
+  
+  painel <- (plot_geral + plot_transicao + plot_fluvial + plot_lacustre) +
+    plot_layout(
+      guides = if (mostrar_legenda) "collect" else "keep",
+      design = design_2x2,
+      widths = c(1, 1),
+      heights = c(1, 1)
+    ) &
+    theme(
+      legend.position = if (mostrar_legenda) "right" else "none",
+      legend.justification = "bottom",
+      legend.box.just = "right",
+      legend.direction = "vertical",
+      plot.margin = margin(8, 8, 8, 8)
+    )
+  
+  painel +
+    plot_annotation(
+      title = titulo_painel,
+      theme = theme(
+        plot.title = element_text(
+          hjust = 0,
+          size = 30,
+          face = "bold"
+        ),
+        plot.margin = margin(10, 10, 10, 10)
+      )
+    )
+}
+
+criar_figura_unica <- function(plot_obj, titulo_painel) {
+  plot_obj +
+    plot_annotation(
+      title = titulo_painel,
+      theme = theme(
+        plot.title = element_text(
+          hjust = 0,
+          size = 30,
+          face = "bold"
+        ),
+        plot.margin = margin(10, 10, 10, 10)
+      )
+    ) &
+    theme(
+      legend.position = "right",
+      legend.justification = "bottom",
+      legend.box.just = "right",
+      legend.direction = "vertical",
+      plot.margin = margin(8, 8, 8, 8)
+    )
+}
+
+criar_figura_unica_montante <- function(plot_obj, titulo_painel, mostrar_legenda = TRUE) {
+  plot_obj +
+    plot_annotation(
+      title = titulo_painel,
+      theme = theme(
+        plot.title = element_text(
+          hjust = 0,
+          size = 34,
+          face = "bold"
+        ),
+        plot.margin = margin(10, 10, 10, 10)
+      )
+    ) &
+    theme(
+      legend.position = if (mostrar_legenda) "right" else "none",
+      legend.justification = "bottom",
+      legend.box.just = "right",
+      legend.direction = "vertical",
+      legend.text = element_text(size = 24),
+      legend.title = element_text(size = 28, face = "bold"),
+      plot.subtitle = element_text(size = 24, hjust = 0, margin = margin(t = 4, b = 6)),
+      plot.margin = margin(8, 8, 8, 8)
+    )
+}
+
+df_com_localidade <- function(df, include_geral = TRUE) {
+  if (include_geral) {
+    bind_rows(
+      df %>% mutate(Localidade = as.character(Zona.de.Pesca)),
+      df %>% mutate(Localidade = "Geral")
+    )
+  } else {
+    df %>% mutate(Localidade = "Montante")
+  }
+}
+
+plot_vazio <- function(titulo_local = NULL, subtitulo_local = NULL) {
+  ggplot() +
+    theme_void() +
+    labs(title = titulo_local, subtitle = subtitulo_local) +
+    theme(
+      plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+      plot.subtitle = element_text(size = 16, hjust = 0.5)
+    )
+}
+
+#===========================================================
+# 6.1) FUNÇÕES AUXILIARES PARA TABELAS DE %
+#===========================================================
+salvar_tabela_percentual <- function(tab, nome_arquivo,
+                                     coluna_categoria = "categoria",
+                                     coluna_valor = "valor",
+                                     nome_categoria_saida = "Classe",
+                                     multiplicar_100 = TRUE) {
+  
+  tab_out <- tab %>%
+    ungroup() %>%
+    mutate(
+      !!coluna_categoria := as.character(.data[[coluna_categoria]])
+    ) %>%
+    group_by(Localidade) %>%
+    mutate(
+      Total_localidade = sum(.data[[coluna_valor]], na.rm = TRUE),
+      Percentual = ifelse(Total_localidade > 0,
+                          .data[[coluna_valor]] / Total_localidade,
+                          0)
+    ) %>%
+    ungroup()
+  
+  if (multiplicar_100) {
+    tab_out <- tab_out %>%
+      mutate(Percentual = round(100 * Percentual, 2))
+  } else {
+    tab_out <- tab_out %>%
+      mutate(Percentual = round(Percentual, 4))
+  }
+  
+  names(tab_out)[names(tab_out) == coluna_categoria] <- nome_categoria_saida
+  names(tab_out)[names(tab_out) == coluna_valor] <- "Valor"
+  
+  write.xlsx(tab_out, nome_arquivo, rowNames = FALSE)
+}
+
+salvar_tabela_percentual_generica <- function(tab, nome_arquivo,
+                                              coluna_categoria,
+                                              coluna_valor,
+                                              nome_categoria_saida = "Classe",
+                                              multiplicar_100 = TRUE) {
+  salvar_tabela_percentual(
+    tab = tab,
+    nome_arquivo = nome_arquivo,
+    coluna_categoria = coluna_categoria,
+    coluna_valor = coluna_valor,
+    nome_categoria_saida = nome_categoria_saida,
+    multiplicar_100 = multiplicar_100
+  )
+}
+
+#===========================================================
+# 7) PREPARAÇÃO DE TABELAS
+#===========================================================
+preparar_tab_simples <- function(df, coluna, include_geral = TRUE, distinct_nome = TRUE) {
+  base <- df_com_localidade(df, include_geral = include_geral)
+  
+  base %>%
+    filter(!is.na(.data[[coluna]]), .data[[coluna]] != "") %>%
+    group_by(Localidade, categoria = .data[[coluna]]) %>%
+    summarise(
+      valor = if (distinct_nome) dplyr::n_distinct(Nome.Completo) else dplyr::n(),
+      .groups = "drop"
+    )
+}
+
+preparar_tab_multiresposta <- function(df, coluna, include_geral = TRUE,
+                                       excluir_padrao = NULL,
+                                       keep_top_n = NULL) {
+  
+  base <- df_com_localidade(df, include_geral = include_geral) %>%
+    filter(!is.na(.data[[coluna]]), .data[[coluna]] != "")
+  
+  if (!is.null(excluir_padrao)) {
+    base <- base %>%
+      filter(!grepl(excluir_padrao, .data[[coluna]], ignore.case = TRUE))
+  }
+  
+  base_sep <- base %>%
+    separate_rows(.data[[coluna]], sep = ",") %>%
+    mutate(categoria = str_trim(.data[[coluna]])) %>%
+    filter(categoria != "")
+  
+  if (!is.null(keep_top_n)) {
+    top_cat <- base_sep %>%
+      filter(Localidade == ifelse(include_geral, "Geral", "Montante")) %>%
+      count(categoria, sort = TRUE) %>%
+      slice_head(n = keep_top_n) %>%
+      pull(categoria)
+    
+    base_sep <- base_sep %>%
+      mutate(categoria = ifelse(categoria %in% top_cat, categoria, "Outros"))
+  }
+  
+  base_sep %>%
+    group_by(Localidade, categoria) %>%
+    summarise(valor = n(), .groups = "drop")
+}
+
+preparar_tab_classes <- function(df, coluna, breaks, labels, include_geral = TRUE,
+                                 distinct_nome = TRUE) {
+  base <- df_com_localidade(df, include_geral = include_geral) %>%
+    filter(!is.na(.data[[coluna]])) %>%
+    mutate(classe = cut(.data[[coluna]], breaks = breaks, labels = labels, right = FALSE)) %>%
+    filter(!is.na(classe))
+  
+  base %>%
+    group_by(Localidade, classe) %>%
+    summarise(
+      valor = if (distinct_nome) dplyr::n_distinct(Nome.Completo) else dplyr::n(),
+      .groups = "drop"
+    )
+}
+
+#===========================================================
+# 8) FUNÇÕES DE GRÁFICOS
+#===========================================================
+fazer_plot_pizza <- function(tab_local, paleta, titulo_local = NULL,
+                             subtitulo_local = NULL,
+                             mostrar_localidade = TRUE,
+                             nome_legenda = NULL) {
+  
+  if (nrow(tab_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
+  
+  categorias <- names(paleta)
+  if (is.null(categorias) || any(is.na(categorias))) {
+    categorias <- sort(unique(as.character(tab_local$categoria)))
+    paleta <- paleta_alfabetica(categorias)
+  }
+  
+  tab_local <- tab_local %>%
+    mutate(categoria = factor(categoria, levels = names(paleta))) %>%
+    tidyr::complete(categoria, fill = list(valor = 0))
+  
+  ggplot(tab_local, aes(x = "", y = valor, fill = categoria)) +
+    geom_col(color = "black", linewidth = 0.05, width = 1) +
+    coord_polar("y", start = 0) +
+    scale_fill_manual(values = paleta, drop = FALSE, name = nome_legenda) +
+    labs(
+      title = localidade_titulo(titulo_local, mostrar_localidade),
+      subtitle = subtitulo_local
+    ) +
+    tema_pizza
+}
+
+fazer_plot_barra_horizontal_local <- function(tab_local, localidade, titulo_local = NULL,
+                                              subtitulo_local = NULL,
+                                              mostrar_localidade = TRUE,
+                                              xlab = "Número de pescadores") {
+  
+  if (nrow(tab_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
+  
+  xmax <- max(tab_local$valor, na.rm = TRUE)
+  
+  breaks_int <- pretty(c(0, xmax), n = 6)
+  breaks_int <- breaks_int[breaks_int >= 0]
+  breaks_int <- unique(round(breaks_int))
+  
+  ggplot(tab_local,
+         aes(x = valor, y = fct_rev(as.factor(classe)), fill = localidade)) +
+    geom_col(color = "black") +
+    scale_fill_manual(values = cores_estrutura, drop = FALSE, name = "Localidade") +
+    scale_x_continuous(
+      breaks = breaks_int,
+      labels = function(x) format(round(x), trim = TRUE, scientific = FALSE)
+    ) +
+    labs(
+      title = localidade_titulo(titulo_local, mostrar_localidade),
+      subtitle = subtitulo_local,
+      x = xlab,
+      y = NULL
+    ) +
+    tema_barra
+}
+
+fazer_plot_malha_local <- function(tab_local, localidade, titulo_local = NULL,
+                                   subtitulo_local = NULL,
+                                   mostrar_localidade = TRUE) {
+  
+  if (nrow(tab_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
+  
+  ymax <- max(tab_local$Quantidade, na.rm = TRUE)
+  breaks_y <- pretty(c(0, ymax), n = 5)
+  breaks_y <- breaks_y[breaks_y >= 0]
+  
+  if (length(breaks_y) < 5) {
+    breaks_y <- seq(0, ceiling(ymax), length.out = 5)
+  }
+  
+  ggplot(tab_local, aes(x = Malha, y = Quantidade, fill = localidade)) +
+    geom_col(color = "black") +
+    scale_fill_manual(values = cores_estrutura, drop = FALSE, name = "Localidade") +
+    scale_y_continuous(
+      breaks = breaks_y,
+      labels = function(x) format(round(x, 0), trim = TRUE, scientific = FALSE)
+    ) +
+    labs(
+      title = localidade_titulo(titulo_local, mostrar_localidade),
+      subtitle = subtitulo_local,
+      x = "Malha",
+      y = "Quantidade"
+    ) +
+    tema_barra +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 13),
+      axis.title.y = element_text(
+        size = 15,
+        margin = margin(r = 12)
+      ),
+      plot.margin = margin(10, 10, 10, 25)
+    )
+}
+
+fazer_plot_box_local <- function(df_local, coluna_valor, localidade, titulo_local = NULL,
+                                 subtitulo_local = NULL,
+                                 mostrar_localidade = TRUE,
+                                 ylab = NULL) {
+  
+  if (nrow(df_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
+  
+  ymax <- max(df_local[[coluna_valor]], na.rm = TRUE)
+  ymin <- min(df_local[[coluna_valor]], na.rm = TRUE)
+  
+  breaks_y <- pretty(c(ymin, ymax), n = 5)
+  
+  if (length(breaks_y) < 5) {
+    breaks_y <- seq(floor(ymin), ceiling(ymax), length.out = 5)
+  }
+  
+  ggplot(df_local, aes(x = localidade, y = .data[[coluna_valor]], fill = localidade)) +
+    geom_boxplot(color = "black", outlier.size = 1) +
+    scale_fill_manual(values = cores_estrutura, drop = FALSE, name = "Localidade") +
+    scale_y_continuous(
+      breaks = breaks_y,
+      labels = function(x) format(round(x, 0), trim = TRUE, scientific = FALSE)
+    ) +
+    labs(
+      title = localidade_titulo(titulo_local, mostrar_localidade),
+      subtitle = subtitulo_local,
+      y = ylab
+    ) +
+    tema_box
+}
+
+fazer_plot_apetrecho_local <- function(tab_local, titulo_local = NULL,
+                                       subtitulo_local = NULL,
+                                       mostrar_localidade = TRUE,
+                                       cor_localidade = "Geral") {
+  
+  if (nrow(tab_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
+  
+  ggplot(tab_local, aes(x = Tipo, y = Presença_ratio)) +
+    geom_col(fill = unname(cores_estrutura[cor_localidade]), color = "black") +
+    geom_text(
+      aes(label = percent(Presença_ratio, accuracy = 1)),
+      vjust = -0.2,
+      size = 7.2,
+      fontface = "bold"
+    ) +
+    scale_y_continuous(
+      labels = percent,
+      limits = c(0, 1),
+      breaks = seq(0, 1, by = 0.2),
+      expand = expansion(mult = c(0, 0.12))
+    ) +
+    labs(
+      title = localidade_titulo(titulo_local, mostrar_localidade),
+      subtitle = subtitulo_local,
+      x = NULL,
+      y = "Proporção"
+    ) +
+    tema_barra +
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(size = 18),
+      axis.text.y = element_text(size = 13)
+    )
+}
+
+#===========================================================
+# 9) PAINÉIS
+#===========================================================
+painel_pizza_3zonas_n <- function(tab, titulo_painel, nome_arquivo, paleta, nome_legenda,
+                                  n_geral, n_fluvial, n_transicao, n_lacustre,
+                                  texto_n = "N") {
+  
+  ordem_geral <- tab %>%
+    filter(Localidade == "Geral") %>%
+    arrange(desc(valor), as.character(categoria)) %>%
+    pull(categoria) %>%
+    as.character()
+  
+  tab <- tab %>%
+    mutate(categoria = factor(as.character(categoria), levels = ordem_geral))
+  
+  paleta <- paleta_por_ordem(ordem_geral)
+  
+  p_geral <- fazer_plot_pizza(
+    tab %>% filter(Localidade == "Geral"),
+    paleta = paleta,
+    titulo_local = "Geral",
+    subtitulo_local = subtitulo_n(n_geral, texto_n),
+    mostrar_localidade = TRUE,
+    nome_legenda = nome_legenda
+  )
+  
+  p_fluvial <- fazer_plot_pizza(
+    tab %>% filter(Localidade == "Fluvial"),
+    paleta = paleta,
+    titulo_local = "Fluvial",
+    subtitulo_local = subtitulo_n(n_fluvial, texto_n),
+    mostrar_localidade = TRUE,
+    nome_legenda = nome_legenda
+  )
+  
+  p_transicao <- fazer_plot_pizza(
+    tab %>% filter(Localidade == "Transição"),
+    paleta = paleta,
+    titulo_local = "Transição",
+    subtitulo_local = subtitulo_n(n_transicao, texto_n),
+    mostrar_localidade = TRUE,
+    nome_legenda = nome_legenda
+  )
+  
+  p_lacustre <- fazer_plot_pizza(
+    tab %>% filter(Localidade == "Lacustre"),
+    paleta = paleta,
+    titulo_local = "Lacustre",
+    subtitulo_local = subtitulo_n(n_lacustre, texto_n),
+    mostrar_localidade = TRUE,
+    nome_legenda = nome_legenda
+  )
+  
+  painel <- criar_painel_2x2(
+    plot_geral = p_geral,
+    plot_fluvial = p_fluvial,
+    plot_transicao = p_transicao,
+    plot_lacustre = p_lacustre,
+    titulo_painel = titulo_painel
+  )
+  
+  salvar_png(painel, nome_arquivo, 1000, 1000)
+}
+
+painel_pizza_montante_n <- function(tab, titulo_painel, nome_arquivo, paleta, nome_legenda,
+                                    n_montante, texto_n = "N") {
+  
+  ordem_montante <- tab %>%
+    filter(Localidade == "Montante") %>%
+    arrange(desc(valor), as.character(categoria)) %>%
+    pull(categoria) %>%
+    as.character()
+  
+  tab <- tab %>%
+    mutate(categoria = factor(as.character(categoria), levels = ordem_montante))
+  
+  paleta <- paleta_por_ordem(ordem_montante)
+  
+  p <- fazer_plot_pizza(
+    tab %>% filter(Localidade == "Montante"),
+    paleta = paleta,
+    titulo_local = NULL,
+    subtitulo_local = subtitulo_n(n_montante, texto_n),
+    mostrar_localidade = FALSE,
+    nome_legenda = nome_legenda
+  )
+  
+  fig <- criar_figura_unica_montante(p, titulo_painel)
+  salvar_png(fig, nome_arquivo, 1000, 1000)
+}
+
+painel_classes_3zonas_n <- function(tab, titulo_painel, nome_arquivo,
+                                    n_geral, n_fluvial, n_transicao, n_lacustre,
+                                    texto_n = "N",
+                                    xlab = "Número de pescadores") {
+  
+  p_geral <- fazer_plot_barra_horizontal_local(
+    tab %>% filter(Localidade == "Geral"),
+    localidade = "Geral",
+    titulo_local = "Geral",
+    subtitulo_local = subtitulo_n(n_geral, texto_n),
+    xlab = xlab
+  )
+  
+  p_fluvial <- fazer_plot_barra_horizontal_local(
+    tab %>% filter(Localidade == "Fluvial"),
+    localidade = "Fluvial",
+    titulo_local = "Fluvial",
+    subtitulo_local = subtitulo_n(n_fluvial, texto_n),
+    xlab = xlab
+  )
+  
+  p_transicao <- fazer_plot_barra_horizontal_local(
+    tab %>% filter(Localidade == "Transição"),
+    localidade = "Transição",
+    titulo_local = "Transição",
+    subtitulo_local = subtitulo_n(n_transicao, texto_n),
+    xlab = xlab
+  )
+  
+  p_lacustre <- fazer_plot_barra_horizontal_local(
+    tab %>% filter(Localidade == "Lacustre"),
+    localidade = "Lacustre",
+    titulo_local = "Lacustre",
+    subtitulo_local = subtitulo_n(n_lacustre, texto_n),
+    xlab = xlab
+  )
+  
+  painel <- criar_painel_2x2(
+    plot_geral = p_geral,
+    plot_fluvial = p_fluvial,
+    plot_transicao = p_transicao,
+    plot_lacustre = p_lacustre,
+    titulo_painel = titulo_painel
+  )
+  
+  salvar_png(painel, nome_arquivo, 1000, 1000)
+}
+
+painel_classes_montante_n <- function(tab, titulo_painel, nome_arquivo,
+                                      n_montante,
+                                      texto_n = "N",
+                                      xlab = "Número de pescadores") {
+  
+  p <- fazer_plot_barra_horizontal_local(
+    tab %>% filter(Localidade == "Montante"),
+    localidade = "Montante",
+    titulo_local = NULL,
+    subtitulo_local = subtitulo_n(n_montante, texto_n),
+    mostrar_localidade = FALSE,
+    xlab = xlab
+  )
+  
+  fig <- criar_figura_unica_montante(p, titulo_painel)
+  salvar_png(fig, nome_arquivo, 1000, 1000)
+}
+
+painel_malha_3zonas_n <- function(tab, titulo_painel, nome_arquivo,
+                                  n_geral, n_fluvial, n_transicao, n_lacustre,
+                                  texto_n = "N") {
+  
+  p_geral <- fazer_plot_malha_local(
+    tab %>% filter(Localidade == "Geral"),
+    "Geral",
+    "Geral",
+    subtitulo_local = subtitulo_n(n_geral, texto_n)
+  )
+  
+  p_fluvial <- fazer_plot_malha_local(
+    tab %>% filter(Localidade == "Fluvial"),
+    "Fluvial",
+    "Fluvial",
+    subtitulo_local = subtitulo_n(n_fluvial, texto_n)
+  )
+  
+  p_transicao <- fazer_plot_malha_local(
+    tab %>% filter(Localidade == "Transição"),
+    "Transição",
+    "Transição",
+    subtitulo_local = subtitulo_n(n_transicao, texto_n)
+  )
+  
+  p_lacustre <- fazer_plot_malha_local(
+    tab %>% filter(Localidade == "Lacustre"),
+    "Lacustre",
+    "Lacustre",
+    subtitulo_local = subtitulo_n(n_lacustre, texto_n)
+  )
+  
+  painel <- criar_painel_2x2(p_geral, p_fluvial, p_transicao, p_lacustre, titulo_painel)
+  salvar_png(painel, nome_arquivo, 1000, 1000)
+}
+
+painel_malha_montante_n <- function(tab, titulo_painel, nome_arquivo,
+                                    n_montante, texto_n = "N") {
+  p <- fazer_plot_malha_local(
+    tab %>% filter(Localidade == "Montante"),
+    "Montante",
+    titulo_local = NULL,
+    subtitulo_local = subtitulo_n(n_montante, texto_n),
+    mostrar_localidade = FALSE
+  ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22)
+    )
+  
+  fig <- criar_figura_unica_montante(p, titulo_painel)
+  salvar_png(fig, nome_arquivo, 1000, 1000)
+}
+
+painel_box_3zonas_n <- function(df_box, coluna, titulo_painel, nome_arquivo,
+                                n_geral, n_fluvial, n_transicao, n_lacustre,
+                                texto_n = "N", ylab = NULL) {
+  
+  p_geral <- fazer_plot_box_local(
+    df_box %>% filter(Localidade == "Geral"),
+    coluna, "Geral", "Geral",
+    subtitulo_local = subtitulo_n(n_geral, texto_n),
+    ylab = ylab
+  )
+  
+  p_fluvial <- fazer_plot_box_local(
+    df_box %>% filter(Localidade == "Fluvial"),
+    coluna, "Fluvial", "Fluvial",
+    subtitulo_local = subtitulo_n(n_fluvial, texto_n),
+    ylab = ylab
+  )
+  
+  p_transicao <- fazer_plot_box_local(
+    df_box %>% filter(Localidade == "Transição"),
+    coluna, "Transição", "Transição",
+    subtitulo_local = subtitulo_n(n_transicao, texto_n),
+    ylab = ylab
+  )
+  
+  p_lacustre <- fazer_plot_box_local(
+    df_box %>% filter(Localidade == "Lacustre"),
+    coluna, "Lacustre", "Lacustre",
+    subtitulo_local = subtitulo_n(n_lacustre, texto_n),
+    ylab = ylab
+  )
+  
+  painel <- criar_painel_2x2(p_geral, p_fluvial, p_transicao, p_lacustre, titulo_painel)
+  salvar_png(painel, nome_arquivo, 1000, 1000)
+}
+
+painel_box_montante_n <- function(df_box, coluna, titulo_painel, nome_arquivo,
+                                  n_montante, texto_n = "N", ylab = NULL) {
+  p <- fazer_plot_box_local(
+    df_box %>% filter(Localidade == "Montante"),
+    coluna,
+    "Montante",
+    titulo_local = NULL,
+    subtitulo_local = subtitulo_n(n_montante, texto_n),
+    mostrar_localidade = FALSE,
+    ylab = ylab
+  ) +
+    theme(
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.y = element_text(size = 22)
+    )
+  
+  fig <- criar_figura_unica_montante(p, titulo_painel)
+  salvar_png(fig, nome_arquivo, 1000, 1000)
+}
+
+painel_apetrecho_3zonas_n <- function(tab, titulo_painel, nome_arquivo,
+                                      n_geral, n_fluvial, n_transicao, n_lacustre,
+                                      texto_n = "N") {
+  
+  p_geral <- fazer_plot_apetrecho_local(
+    tab %>% filter(Localidade == "Geral"),
+    "Geral",
+    subtitulo_local = subtitulo_n(n_geral, texto_n),
+    cor_localidade = "Geral"
+  )
+  
+  p_fluvial <- fazer_plot_apetrecho_local(
+    tab %>% filter(Localidade == "Fluvial"),
+    "Fluvial",
+    subtitulo_local = subtitulo_n(n_fluvial, texto_n),
+    cor_localidade = "Fluvial"
+  )
+  
+  p_transicao <- fazer_plot_apetrecho_local(
+    tab %>% filter(Localidade == "Transição"),
+    "Transição",
+    subtitulo_local = subtitulo_n(n_transicao, texto_n),
+    cor_localidade = "Transição"
+  )
+  
+  p_lacustre <- fazer_plot_apetrecho_local(
+    tab %>% filter(Localidade == "Lacustre"),
+    "Lacustre",
+    subtitulo_local = subtitulo_n(n_lacustre, texto_n),
+    cor_localidade = "Lacustre"
+  )
+  
+  painel <- criar_painel_2x2(p_geral, p_fluvial, p_transicao, p_lacustre, titulo_painel)
+  salvar_png(painel, nome_arquivo, 1000, 1000)
+}
+
+painel_apetrecho_montante_n <- function(tab, titulo_painel, nome_arquivo,
+                                        n_montante, texto_n = "N") {
+  p <- fazer_plot_apetrecho_local(
+    tab %>% filter(Localidade == "Montante"),
+    titulo_local = NULL,
+    subtitulo_local = subtitulo_n(n_montante, texto_n),
+    mostrar_localidade = FALSE,
+    cor_localidade = "Montante"
+  ) +
+    theme(
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.y = element_text(size = 22)
+    )
+  
+  fig <- criar_figura_unica_montante(p, titulo_painel)
+  salvar_png(fig, nome_arquivo, 1000, 1000)
+}
+
+#===========================================================
+# 10) FUNÇÃO PRINCIPAL
+#===========================================================
+rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
+                        include_geral = TRUE) {
+  
+  dir.create(pasta_saida, showWarnings = FALSE, recursive = TRUE)
+  
+  wd_original <- getwd()
+  setwd(pasta_saida)
+  on.exit(setwd(wd_original), add = TRUE)
+  
+  # 01 Pescadores por zonas
+  if (include_geral) {
+    tab_zona <- df_socio %>%
+      group_by(Zona.de.Pesca) %>%
+      summarise(n = dplyr::n_distinct(Nome.Completo), .groups = "drop")
+    
+    tab_zona_excel <- tab_zona %>%
+      rename(Localidade = Zona.de.Pesca, Valor = n) %>%
+      mutate(
+        Total = sum(Valor, na.rm = TRUE),
+        Percentual = round(100 * Valor / Total, 2)
+      )
+    
+    write.xlsx(tab_zona_excel, "01_tabela_pescadores_por_zonas.xlsx", rowNames = FALSE)
+    
+    p_zona <- ggplot(tab_zona, aes(x = "", y = n, fill = Zona.de.Pesca)) +
+      geom_col(color = "black", linewidth = 0.05, width = 1) +
+      coord_polar("y", start = 0) +
+      scale_fill_manual(
+        values = cores_zona[names(cores_zona) %in% as.character(tab_zona$Zona.de.Pesca)],
+        name = "Zona"
+      ) +
+      labs(
+        title = NULL,
+        subtitle = subtitulo_n(
+          dplyr::n_distinct(df_socio$Nome.Completo),
+          "Número total de registros de pescadores"
+        )
+      ) +
+      theme_void() +
+      theme(
+        legend.position = "right",
+        legend.justification = "bottom",
+        legend.box.just = "right",
+        legend.direction = "vertical",
+        legend.text = element_text(size = 24),
+        legend.title = element_text(size = 28, face = "bold"),
+        plot.subtitle = element_text(size = 24, hjust = 0, margin = margin(t = 4, b = 6))
+      )
+    
+    p_zona_final <- p_zona +
+      plot_annotation(
+        title = "Pescadores por zonas",
+        theme = theme(
+          plot.title = element_text(
+            hjust = 0,
+            size = 34,
+            face = "bold"
+          ),
+          plot.margin = margin(10, 10, 10, 10)
+        )
+      ) &
+      theme(
+        legend.position = "right",
+        legend.justification = "bottom",
+        legend.box.just = "right",
+        legend.direction = "vertical",
+        plot.margin = margin(8, 8, 8, 8)
+      )
+    
+    salvar_png(p_zona_final, "01_pescadores_por_zonas.png", 1000, 1000)
+  }
+  
+  # 02 Sexo
+  if ("Sexo" %in% names(df_socio)) {
+    tab_sexo <- preparar_tab_simples(df_socio, "Sexo", include_geral = include_geral) %>%
+      filter(categoria %in% c("Masculino", "Feminino"))
+    
+    salvar_tabela_percentual(
+      tab_sexo,
+      "02_tabela_sexo_dos_pescadores.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Sexo"
+    )
+    
+    n_geral <- if (include_geral) n_valido_simples(df_socio, "Sexo", "Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_valido_simples(df_socio, "Sexo", "Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_valido_simples(df_socio, "Sexo", "Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_valido_simples(df_socio, "Sexo", "Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_valido_simples(df_socio, "Sexo", "Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_sexo,
+        titulo_painel = "Sexo dos pescadores",
+        nome_arquivo = "02_sexo_dos_pescadores.png",
+        paleta = cores_sexo,
+        nome_legenda = "Sexo",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros de pescadores"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_sexo,
+        titulo_painel = "Sexo dos pescadores",
+        nome_arquivo = "02_sexo_dos_pescadores.png",
+        paleta = cores_sexo,
+        nome_legenda = "Sexo",
+        n_montante = n_montante,
+        texto_n = "Número total de registros de pescadores"
+      )
+    }
+  }
+  
+  # 03 Presença de ajudantes
+  col_aj <- "Trabalha.com.ajudante.de.pesca."
+  if (col_aj %in% names(df_socio)) {
+    tab_aj <- preparar_tab_simples(df_socio, col_aj, include_geral = include_geral) %>%
+      filter(categoria %in% c("Sim", "Não", "Nao")) %>%
+      mutate(categoria = ifelse(categoria == "Nao", "Não", as.character(categoria))) %>%
+      group_by(Localidade, categoria) %>%
+      summarise(valor = sum(valor), .groups = "drop")
+    
+    salvar_tabela_percentual(
+      tab_aj,
+      "03_tabela_presenca_de_ajudantes.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Presenca_de_ajudantes"
+    )
+    
+    n_geral <- if (include_geral) n_valido_simples(df_socio, col_aj, "Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_valido_simples(df_socio, col_aj, "Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_valido_simples(df_socio, col_aj, "Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_valido_simples(df_socio, col_aj, "Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_valido_simples(df_socio, col_aj, "Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_aj,
+        titulo_painel = "Presença de ajudantes",
+        nome_arquivo = "03_presenca_de_ajudantes.png",
+        paleta = cores_ajudantes_bin,
+        nome_legenda = "Presença de ajudantes",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros de pescadores"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_aj,
+        titulo_painel = "Presença de ajudantes",
+        nome_arquivo = "03_presenca_de_ajudantes.png",
+        paleta = cores_ajudantes_bin,
+        nome_legenda = "Presença de ajudantes",
+        n_montante = n_montante,
+        texto_n = "Número total de registros de pescadores"
+      )
+    }
+  }
+  
+  # 04 Número de dependentes
+  col_dep <- "Quantas.pessoas.dependem.da.sua.renda."
+  if (col_dep %in% names(df_socio)) {
+    base_dep <- df_com_localidade(df_socio, include_geral = include_geral) %>%
+      filter(!is.na(.data[[col_dep]]), .data[[col_dep]] != "") %>%
+      mutate(dep_num = suppressWarnings(as.numeric(.data[[col_dep]]))) %>%
+      filter(!is.na(dep_num)) %>%
+      mutate(
+        categoria = case_when(
+          dep_num == 0 ~ "0",
+          dep_num == 1 ~ "1",
+          dep_num == 2 ~ "2",
+          dep_num == 3 ~ "3",
+          dep_num == 4 ~ "4",
+          dep_num == 5 ~ "5",
+          dep_num >= 6 ~ ">=6",
+          TRUE ~ NA_character_
+        )
+      ) %>%
+      filter(!is.na(categoria))
+    
+    tab_dep <- base_dep %>%
+      group_by(Localidade, categoria) %>%
+      summarise(valor = dplyr::n_distinct(Nome.Completo), .groups = "drop")
+    
+    salvar_tabela_percentual(
+      tab_dep,
+      "04_tabela_numero_de_dependentes.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Numero_de_dependentes"
+    )
+    
+    ordem_dep <- c("0", "1", "2", "3", "4", "5", ">=6")
+    pal_dep <- stats::setNames(paleta_categorica_10[1:7], ordem_dep)
+    tab_dep$categoria <- factor(tab_dep$categoria, levels = ordem_dep)
+    
+    n_dep_fun <- function(local, incl) {
+      base <- if (local == "Geral" && incl) df_socio else df_socio %>% filter(Zona.de.Pesca == local)
+      base %>%
+        filter(!is.na(.data[[col_dep]]), .data[[col_dep]] != "") %>%
+        mutate(dep_num = suppressWarnings(as.numeric(.data[[col_dep]]))) %>%
+        filter(!is.na(dep_num)) %>%
+        summarise(n = dplyr::n_distinct(Nome.Completo)) %>%
+        pull(n)
+    }
+    
+    n_geral <- if (include_geral) n_dep_fun("Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_dep_fun("Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_dep_fun("Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_dep_fun("Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_dep_fun("Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_dep,
+        titulo_painel = "Número de dependentes",
+        nome_arquivo = "04_numero_de_dependentes.png",
+        paleta = pal_dep,
+        nome_legenda = "Número de dependentes",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros de pescadores"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_dep,
+        titulo_painel = "Número de dependentes",
+        nome_arquivo = "04_numero_de_dependentes.png",
+        paleta = pal_dep,
+        nome_legenda = "Número de dependentes",
+        n_montante = n_montante,
+        texto_n = "Número total de registros de pescadores"
+      )
+    }
+  }
+  
+  # 05 Classes de ajudantes
+  col_quem_aj <- "Quem.é.são.os.ajudantes"
+  if (col_quem_aj %in% names(df_socio)) {
+    tab_quem_aj <- preparar_tab_multiresposta(
+      df_socio,
+      col_quem_aj,
+      include_geral = include_geral,
+      keep_top_n = 5
+    )
+    
+    salvar_tabela_percentual(
+      tab_quem_aj,
+      "05_tabela_classes_de_ajudantes.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Classe_de_ajudante"
+    )
+    
+    categorias_aj <- sort(unique(as.character(tab_quem_aj$categoria)))
+    pal_aj <- paleta_alfabetica(categorias_aj)
+    
+    n_geral <- if (include_geral) n_valido_multiresposta(df_socio, col_quem_aj, "Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_valido_multiresposta(df_socio, col_quem_aj, "Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_valido_multiresposta(df_socio, col_quem_aj, "Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_valido_multiresposta(df_socio, col_quem_aj, "Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_valido_multiresposta(df_socio, col_quem_aj, "Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_quem_aj,
+        titulo_painel = "Classes de ajudantes",
+        nome_arquivo = "05_classes_de_ajudantes.png",
+        paleta = pal_aj,
+        nome_legenda = "Ajudantes",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros de ajudantes"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_quem_aj,
+        titulo_painel = "Classes de ajudantes",
+        nome_arquivo = "05_classes_de_ajudantes.png",
+        paleta = pal_aj,
+        nome_legenda = "Ajudantes",
+        n_montante = n_montante,
+        texto_n = "Número total de registros de ajudantes"
+      )
+    }
+  }
+  
+  # 06 Outras fontes de renda
+  col_renda <- "Qual.é.a.origem.da.sua.outra.fonte.de.renda."
+  if (col_renda %in% names(df_socio)) {
+    tab_renda <- preparar_tab_multiresposta(
+      df_socio,
+      col_renda,
+      include_geral = include_geral,
+      excluir_padrao = "Não"
+    )
+    
+    salvar_tabela_percentual(
+      tab_renda,
+      "06_tabela_outras_fontes_de_renda.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Outra_fonte_de_renda"
+    )
+    
+    categorias_renda <- sort(unique(as.character(tab_renda$categoria)))
+    pal_renda <- paleta_alfabetica(categorias_renda)
+    
+    n_geral <- if (include_geral) n_valido_multiresposta(df_socio, col_renda, "Geral", TRUE, excluir_padrao = "Não") else NULL
+    n_fluvial <- if (include_geral) n_valido_multiresposta(df_socio, col_renda, "Fluvial", TRUE, excluir_padrao = "Não") else NULL
+    n_transicao <- if (include_geral) n_valido_multiresposta(df_socio, col_renda, "Transição", TRUE, excluir_padrao = "Não") else NULL
+    n_lacustre <- if (include_geral) n_valido_multiresposta(df_socio, col_renda, "Lacustre", TRUE, excluir_padrao = "Não") else NULL
+    n_montante <- if (!include_geral) n_valido_multiresposta(df_socio, col_renda, "Montante", FALSE, excluir_padrao = "Não") else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_renda,
+        titulo_painel = "Outras fontes de renda",
+        nome_arquivo = "06_outras_fontes_de_renda.png",
+        paleta = pal_renda,
+        nome_legenda = "Atividades",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_renda,
+        titulo_painel = "Outras fontes de renda",
+        nome_arquivo = "06_outras_fontes_de_renda.png",
+        paleta = pal_renda,
+        nome_legenda = "Atividades",
+        n_montante = n_montante,
+        texto_n = "Número total de registros"
+      )
+    }
+  }
+  
+  # 07 Tipos de embarcações
+  col_barco <- "Material.do.Barco"
+  if (col_barco %in% names(df_socio)) {
+    tab_barco <- preparar_tab_simples(df_socio, col_barco, include_geral = include_geral)
+    
+    salvar_tabela_percentual(
+      tab_barco,
+      "07_tabela_tipos_de_embarcacoes.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Tipo_de_embarcacao"
+    )
+    
+    categorias_barco <- sort(unique(as.character(tab_barco$categoria)))
+    pal_barco <- paleta_alfabetica(categorias_barco)
+    
+    n_geral <- if (include_geral) n_valido_simples(df_socio, col_barco, "Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_valido_simples(df_socio, col_barco, "Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_valido_simples(df_socio, col_barco, "Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_valido_simples(df_socio, col_barco, "Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_valido_simples(df_socio, col_barco, "Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_barco,
+        titulo_painel = "Tipos de embarcações",
+        nome_arquivo = "07_tipos_de_embarcacoes.png",
+        paleta = pal_barco,
+        nome_legenda = "Tipos de embarcações",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de embarcações"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_barco,
+        titulo_painel = "Tipos de embarcações",
+        nome_arquivo = "07_tipos_de_embarcacoes.png",
+        paleta = pal_barco,
+        nome_legenda = "Tipos de embarcações",
+        n_montante = n_montante,
+        texto_n = "Número total de embarcações"
+      )
+    }
+  }
+  
+  # 08 Tipos de motores
+  col_motor <- "Propulsão"
+  if (col_motor %in% names(df_socio)) {
+    tab_motor <- preparar_tab_simples(df_socio, col_motor, include_geral = include_geral)
+    
+    salvar_tabela_percentual(
+      tab_motor,
+      "08_tabela_tipos_de_motores.xlsx",
+      coluna_categoria = "categoria",
+      coluna_valor = "valor",
+      nome_categoria_saida = "Tipo_de_motor"
+    )
+    
+    categorias_motor <- sort(unique(as.character(tab_motor$categoria)))
+    pal_motor <- paleta_alfabetica(categorias_motor)
+    
+    n_geral <- if (include_geral) n_valido_simples(df_socio, col_motor, "Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_valido_simples(df_socio, col_motor, "Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_valido_simples(df_socio, col_motor, "Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_valido_simples(df_socio, col_motor, "Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_valido_simples(df_socio, col_motor, "Montante", FALSE) else NULL
+    
+    if (include_geral) {
+      painel_pizza_3zonas_n(
+        tab_motor,
+        titulo_painel = "Tipos de motores",
+        nome_arquivo = "08_tipos_de_motores.png",
+        paleta = pal_motor,
+        nome_legenda = "Tipos de motores",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de motores"
+      )
+    } else {
+      painel_pizza_montante_n(
+        tab_motor,
+        titulo_painel = "Tipos de motores",
+        nome_arquivo = "08_tipos_de_motores.png",
+        paleta = pal_motor,
+        nome_legenda = "Tipos de motores",
+        n_montante = n_montante,
+        texto_n = "Número total de motores"
+      )
+    }
+  }
+  
+  # 09 Estrutura etária (sem legenda)
+  if ("Data.de.nascimento" %in% names(df_socio)) {
+    df_idade <- df_socio %>%
+      mutate(Idade = interval(Data.de.nascimento, Sys.Date()) %/% years(1)) %>%
+      filter(!is.na(Idade), Idade > 0)
+    
+    if (nrow(df_idade) > 0) {
+      breaks_idade <- c(20, 30, 40, 50, 60, 70, 80, 90)
+      labels_idade <- c("20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89")
+      
+      tab_idade <- preparar_tab_classes(
+        df_idade,
+        coluna = "Idade",
+        breaks = breaks_idade,
+        labels = labels_idade,
+        include_geral = include_geral,
+        distinct_nome = TRUE
+      )
+      
+      salvar_tabela_percentual_generica(
+        tab = tab_idade,
+        nome_arquivo = "09_tabela_estrutura_etaria.xlsx",
+        coluna_categoria = "classe",
+        coluna_valor = "valor",
+        nome_categoria_saida = "Classe_etaria"
+      )
+      
+      n_geral <- if (include_geral) n_valido_classes(df_idade, "Idade", "Geral", TRUE, breaks_idade, labels_idade, TRUE) else NULL
+      n_fluvial <- if (include_geral) n_valido_classes(df_idade, "Idade", "Fluvial", TRUE, breaks_idade, labels_idade, TRUE) else NULL
+      n_transicao <- if (include_geral) n_valido_classes(df_idade, "Idade", "Transição", TRUE, breaks_idade, labels_idade, TRUE) else NULL
+      n_lacustre <- if (include_geral) n_valido_classes(df_idade, "Idade", "Lacustre", TRUE, breaks_idade, labels_idade, TRUE) else NULL
+      n_montante <- if (!include_geral) n_valido_classes(df_idade, "Idade", "Montante", FALSE, breaks_idade, labels_idade, TRUE) else NULL
+      
+      if (include_geral) {
+        painel <- criar_painel_2x2(
+          fazer_plot_barra_horizontal_local(
+            tab_idade %>% filter(Localidade == "Geral"),
+            "Geral", "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_idade %>% filter(Localidade == "Fluvial"),
+            "Fluvial", "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_idade %>% filter(Localidade == "Transição"),
+            "Transição", "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_idade %>% filter(Localidade == "Lacustre"),
+            "Lacustre", "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          "Estrutura etária",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(painel, "09_estrutura_etaria.png", 1000, 1000)
+      } else {
+        fig <- criar_figura_unica_montante(
+          fazer_plot_barra_horizontal_local(
+            tab_idade %>% filter(Localidade == "Montante"),
+            "Montante",
+            titulo_local = NULL,
+            subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+            mostrar_localidade = FALSE
+          ) +
+            theme(
+              legend.position = "none",
+              axis.text.x = element_text(size = 20),
+              axis.text.y = element_text(size = 20),
+              axis.title.x = element_text(size = 22),
+              axis.title.y = element_text(size = 22)
+            ),
+          "Estrutura etária",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(fig, "09_estrutura_etaria.png", 1000, 1000)
+      }
+    }
+  }
+  
+  # 10 Tempo de pesca (sem legenda)
+  col_tempo <- "Há.quantos.anos.você.pesca."
+  if (col_tempo %in% names(df_socio)) {
+    df_tempo <- df_socio %>% filter(!is.na(.data[[col_tempo]]), .data[[col_tempo]] > 0)
+    
+    if (nrow(df_tempo) > 0) {
+      max_tempo <- max(df_tempo[[col_tempo]], na.rm = TRUE)
+      breaks_tempo <- seq(0, max_tempo + 5, by = 5)
+      labels_tempo <- paste0(breaks_tempo[-length(breaks_tempo)], "-", breaks_tempo[-1] - 1)
+      
+      tab_tempo <- preparar_tab_classes(
+        df_tempo,
+        coluna = col_tempo,
+        breaks = breaks_tempo,
+        labels = labels_tempo,
+        include_geral = include_geral,
+        distinct_nome = TRUE
+      )
+      
+      salvar_tabela_percentual_generica(
+        tab = tab_tempo,
+        nome_arquivo = "10_tabela_tempo_de_pesca.xlsx",
+        coluna_categoria = "classe",
+        coluna_valor = "valor",
+        nome_categoria_saida = "Classe_tempo_de_pesca"
+      )
+      
+      n_geral <- if (include_geral) n_valido_classes(df_tempo, col_tempo, "Geral", TRUE, breaks_tempo, labels_tempo, TRUE) else NULL
+      n_fluvial <- if (include_geral) n_valido_classes(df_tempo, col_tempo, "Fluvial", TRUE, breaks_tempo, labels_tempo, TRUE) else NULL
+      n_transicao <- if (include_geral) n_valido_classes(df_tempo, col_tempo, "Transição", TRUE, breaks_tempo, labels_tempo, TRUE) else NULL
+      n_lacustre <- if (include_geral) n_valido_classes(df_tempo, col_tempo, "Lacustre", TRUE, breaks_tempo, labels_tempo, TRUE) else NULL
+      n_montante <- if (!include_geral) n_valido_classes(df_tempo, col_tempo, "Montante", FALSE, breaks_tempo, labels_tempo, TRUE) else NULL
+      
+      if (include_geral) {
+        painel <- criar_painel_2x2(
+          fazer_plot_barra_horizontal_local(
+            tab_tempo %>% filter(Localidade == "Geral"),
+            "Geral", "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_tempo %>% filter(Localidade == "Fluvial"),
+            "Fluvial", "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_tempo %>% filter(Localidade == "Transição"),
+            "Transição", "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_tempo %>% filter(Localidade == "Lacustre"),
+            "Lacustre", "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          "Tempo de pesca no reservatório",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(painel, "10_tempo_de_pesca.png", 1000, 1000)
+      } else {
+        fig <- criar_figura_unica_montante(
+          fazer_plot_barra_horizontal_local(
+            tab_tempo %>% filter(Localidade == "Montante"),
+            "Montante",
+            titulo_local = NULL,
+            subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+            mostrar_localidade = FALSE
+          ) +
+            theme(
+              legend.position = "none",
+              axis.text.x = element_text(size = 20),
+              axis.text.y = element_text(size = 20),
+              axis.title.x = element_text(size = 22),
+              axis.title.y = element_text(size = 22)
+            ),
+          "Tempo de pesca no rio",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(fig, "10_tempo_de_pesca.png", 1000, 1000)
+      }
+    }
+  }
+  
+  # 11 Número de anzóis (sem legenda)
+  if ("Quantidade" %in% names(anzois_raw)) {
+    sum_anzois <- aggregate(Quantidade ~ Parent.Row.ID, data = anzois_raw, sum)
+    merged_anzois <- merge(sum_anzois, df_socio, by.x = "Parent.Row.ID", by.y = "Row.ID", all.y = TRUE) %>%
+      filter(!is.na(Quantidade), Quantidade > 0)
+    
+    if (nrow(merged_anzois) > 0) {
+      max_q <- max(merged_anzois$Quantidade, na.rm = TRUE)
+      breaks_q <- seq(0, max_q + 200, by = 200)
+      labels_q <- paste0(breaks_q[-length(breaks_q)], "-", breaks_q[-1] - 1)
+      
+      tab_anz <- preparar_tab_classes(
+        merged_anzois,
+        coluna = "Quantidade",
+        breaks = breaks_q,
+        labels = labels_q,
+        include_geral = include_geral,
+        distinct_nome = TRUE
+      )
+      
+      salvar_tabela_percentual_generica(
+        tab = tab_anz,
+        nome_arquivo = "11_tabela_numero_de_anzois.xlsx",
+        coluna_categoria = "classe",
+        coluna_valor = "valor",
+        nome_categoria_saida = "Classe_numero_de_anzois"
+      )
+      
+      n_geral <- if (include_geral) n_valido_classes(merged_anzois, "Quantidade", "Geral", TRUE, breaks_q, labels_q, TRUE) else NULL
+      n_fluvial <- if (include_geral) n_valido_classes(merged_anzois, "Quantidade", "Fluvial", TRUE, breaks_q, labels_q, TRUE) else NULL
+      n_transicao <- if (include_geral) n_valido_classes(merged_anzois, "Quantidade", "Transição", TRUE, breaks_q, labels_q, TRUE) else NULL
+      n_lacustre <- if (include_geral) n_valido_classes(merged_anzois, "Quantidade", "Lacustre", TRUE, breaks_q, labels_q, TRUE) else NULL
+      n_montante <- if (!include_geral) n_valido_classes(merged_anzois, "Quantidade", "Montante", FALSE, breaks_q, labels_q, TRUE) else NULL
+      
+      if (include_geral) {
+        painel <- criar_painel_2x2(
+          fazer_plot_barra_horizontal_local(
+            tab_anz %>% filter(Localidade == "Geral"),
+            "Geral", "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_anz %>% filter(Localidade == "Fluvial"),
+            "Fluvial", "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_anz %>% filter(Localidade == "Transição"),
+            "Transição", "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_barra_horizontal_local(
+            tab_anz %>% filter(Localidade == "Lacustre"),
+            "Lacustre", "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          "Número de anzóis",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(painel, "11_numero_de_anzois.png", 1000, 1000)
+      } else {
+        fig <- criar_figura_unica_montante(
+          fazer_plot_barra_horizontal_local(
+            tab_anz %>% filter(Localidade == "Montante"),
+            "Montante",
+            titulo_local = NULL,
+            subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+            mostrar_localidade = FALSE
+          ) +
+            theme(
+              legend.position = "none",
+              axis.text.x = element_text(size = 20),
+              axis.text.y = element_text(size = 20),
+              axis.title.x = element_text(size = 22),
+              axis.title.y = element_text(size = 22)
+            ),
+          "Número de anzóis",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(fig, "11_numero_de_anzois.png", 1000, 1000)
+      }
+    }
+  }
+  
+  # 12 Malhas de redes (sem legenda)
+  if (all(c("Parent.Row.ID", "Malha", "Quantidade") %in% names(redes_raw))) {
+    merged_redes <- merge(redes_raw, df_socio, by.x = "Parent.Row.ID", by.y = "Row.ID", all.y = TRUE) %>%
+      filter(!is.na(Malha), !is.na(Quantidade))
+    
+    if (nrow(merged_redes) > 0) {
+      base_redes <- if (include_geral) {
+        bind_rows(
+          merged_redes %>% mutate(Localidade = as.character(Zona.de.Pesca)),
+          merged_redes %>% mutate(Localidade = "Geral")
+        )
+      } else {
+        merged_redes %>% mutate(Localidade = "Montante")
+      }
+      
+      ordem_malhas <- c("M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15",
+                        "M16", "M17", "M18", "M19", "M20", "M21", "M22")
+      
+      tab_malha <- base_redes %>%
+        mutate(Malha = factor(as.character(Malha), levels = ordem_malhas)) %>%
+        filter(!is.na(Malha)) %>%
+        group_by(Localidade, Malha) %>%
+        summarise(Quantidade = sum(Quantidade, na.rm = TRUE), .groups = "drop")
+      
+      salvar_tabela_percentual_generica(
+        tab = tab_malha,
+        nome_arquivo = "12_tabela_malhas_de_redes.xlsx",
+        coluna_categoria = "Malha",
+        coluna_valor = "Quantidade",
+        nome_categoria_saida = "Malha"
+      )
+      
+      n_geral <- if (include_geral) dplyr::n_distinct(merged_redes$Nome.Completo) else NULL
+      n_fluvial <- if (include_geral) dplyr::n_distinct(merged_redes %>% filter(Zona.de.Pesca == "Fluvial") %>% pull(Nome.Completo)) else NULL
+      n_transicao <- if (include_geral) dplyr::n_distinct(merged_redes %>% filter(Zona.de.Pesca == "Transição") %>% pull(Nome.Completo)) else NULL
+      n_lacustre <- if (include_geral) dplyr::n_distinct(merged_redes %>% filter(Zona.de.Pesca == "Lacustre") %>% pull(Nome.Completo)) else NULL
+      n_montante <- if (!include_geral) dplyr::n_distinct(merged_redes$Nome.Completo) else NULL
+      
+      if (include_geral) {
+        painel <- criar_painel_2x2(
+          fazer_plot_malha_local(
+            tab_malha %>% filter(Localidade == "Geral"),
+            "Geral", "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_malha_local(
+            tab_malha %>% filter(Localidade == "Fluvial"),
+            "Fluvial", "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_malha_local(
+            tab_malha %>% filter(Localidade == "Transição"),
+            "Transição", "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          fazer_plot_malha_local(
+            tab_malha %>% filter(Localidade == "Lacustre"),
+            "Lacustre", "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+          ) + theme(legend.position = "none"),
+          "Malhas de redes",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(painel, "12_malhas_de_redes.png", 1000, 1000)
+      } else {
+        fig <- criar_figura_unica_montante(
+          fazer_plot_malha_local(
+            tab_malha %>% filter(Localidade == "Montante"),
+            "Montante",
+            titulo_local = NULL,
+            subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+            mostrar_localidade = FALSE
+          ) +
+            theme(
+              legend.position = "none",
+              axis.text.x = element_text(angle = 45, hjust = 1, size = 20),
+              axis.text.y = element_text(size = 20),
+              axis.title.x = element_text(size = 22),
+              axis.title.y = element_text(size = 22)
+            ),
+          "Malhas de redes",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(fig, "12_malhas_de_redes.png", 1000, 1000)
+      }
+    }
+  }
+  
+  # 13 Metros quadrados de redes (boxplot)
+  if (all(c("Parent.Row.ID", "Comprimento..m.", "Altura..m.", "Quantidade") %in% names(redes_raw))) {
+    redes_m2 <- redes_raw %>%
+      mutate(m2 = Comprimento..m. * Altura..m. * Quantidade)
+    
+    merged_m2 <- merge(
+      redes_m2 %>% group_by(Parent.Row.ID) %>% summarise(m2 = sum(m2, na.rm = TRUE), .groups = "drop"),
+      df_socio,
+      by.x = "Parent.Row.ID",
+      by.y = "Row.ID",
+      all.y = TRUE
+    ) %>%
+      filter(!is.na(m2))
+    
+    if (nrow(merged_m2) > 0) {
+      box_df <- if (include_geral) {
+        bind_rows(
+          merged_m2 %>% mutate(Localidade = as.character(Zona.de.Pesca)),
+          merged_m2 %>% mutate(Localidade = "Geral")
+        )
+      } else {
+        merged_m2 %>% mutate(Localidade = "Montante")
+      }
+      
+      n_geral <- if (include_geral) dplyr::n_distinct(merged_m2$Nome.Completo) else NULL
+      n_fluvial <- if (include_geral) dplyr::n_distinct(merged_m2 %>% filter(Zona.de.Pesca == "Fluvial") %>% pull(Nome.Completo)) else NULL
+      n_transicao <- if (include_geral) dplyr::n_distinct(merged_m2 %>% filter(Zona.de.Pesca == "Transição") %>% pull(Nome.Completo)) else NULL
+      n_lacustre <- if (include_geral) dplyr::n_distinct(merged_m2 %>% filter(Zona.de.Pesca == "Lacustre") %>% pull(Nome.Completo)) else NULL
+      n_montante <- if (!include_geral) dplyr::n_distinct(merged_m2$Nome.Completo) else NULL
+      
+      if (include_geral) {
+        painel <- criar_painel_2x2(
+          fazer_plot_box_local(
+            box_df %>% filter(Localidade == "Geral"),
+            "m2", "Geral", "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores"),
+            ylab = "m²"
+          ) + theme(legend.position = "none"),
+          fazer_plot_box_local(
+            box_df %>% filter(Localidade == "Fluvial"),
+            "m2", "Fluvial", "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores"),
+            ylab = "m²"
+          ) + theme(legend.position = "none"),
+          fazer_plot_box_local(
+            box_df %>% filter(Localidade == "Transição"),
+            "m2", "Transição", "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores"),
+            ylab = "m²"
+          ) + theme(legend.position = "none"),
+          fazer_plot_box_local(
+            box_df %>% filter(Localidade == "Lacustre"),
+            "m2", "Lacustre", "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores"),
+            ylab = "m²"
+          ) + theme(legend.position = "none"),
+          "Metros quadrados de redes",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(painel, "13_metros_quadrados_de_redes.png", 1000, 1000)
+      } else {
+        fig <- criar_figura_unica_montante(
+          fazer_plot_box_local(
+            box_df %>% filter(Localidade == "Montante"),
+            "m2",
+            "Montante",
+            titulo_local = NULL,
+            subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
+            mostrar_localidade = FALSE,
+            ylab = "m²"
+          ) +
+            theme(
+              legend.position = "none",
+              axis.text.x = element_text(size = 20),
+              axis.text.y = element_text(size = 20),
+              axis.title.y = element_text(size = 22)
+            ),
+          "Metros quadrados de redes",
+          mostrar_legenda = FALSE
+        )
+        salvar_png(fig, "13_metros_quadrados_de_redes.png", 1000, 1000)
+      }
+      
+      resumo_m2 <- box_df %>%
+        group_by(Localidade) %>%
+        summarise(
+          n = dplyr::n(),
+          total_m2 = sum(m2, na.rm = TRUE),
+          media_m2 = mean(m2, na.rm = TRUE),
+          mediana_m2 = median(m2, na.rm = TRUE),
+          q1_m2 = quantile(m2, 0.25, na.rm = TRUE),
+          q3_m2 = quantile(m2, 0.75, na.rm = TRUE),
+          minimo_m2 = min(m2, na.rm = TRUE),
+          maximo_m2 = max(m2, na.rm = TRUE),
+          .groups = "drop"
+        )
+      
+      write.xlsx(resumo_m2, "13_tabela_metros_quadrados_de_redes.xlsx", rowNames = FALSE)
+    }
+  }
+  
+  # 14 Anzóis e redes em porcentagem
+  if (all(c("Parent.Row.ID", "Malha") %in% names(redes_raw)) &&
+      all(c("Parent.Row.ID", "Quantidade") %in% names(anzois_raw))) {
+    
+    merged_redes <- merge(redes_raw, df_socio, by.x = "Parent.Row.ID", by.y = "Row.ID", all.y = TRUE)
+    merged_anzois <- merge(anzois_raw, df_socio, by.x = "Parent.Row.ID", by.y = "Row.ID", all.y = TRUE)
+    
+    redes_pres <- merged_redes %>%
+      mutate(Redes = ifelse(!is.na(Malha), 1, 0)) %>%
+      group_by(Nome.Completo, Zona.de.Pesca) %>%
+      summarise(Redes = max(Redes, na.rm = TRUE), .groups = "drop")
+    
+    anzois_pres <- merged_anzois %>%
+      mutate(Anzóis = ifelse(!is.na(Quantidade), 1, 0)) %>%
+      group_by(Nome.Completo, Zona.de.Pesca) %>%
+      summarise(Anzóis = max(Anzóis, na.rm = TRUE), .groups = "drop")
+    
+    apetrechos <- full_join(redes_pres, anzois_pres, by = c("Nome.Completo", "Zona.de.Pesca")) %>%
+      mutate(
+        Redes = ifelse(is.na(Redes), 0, Redes),
+        Anzóis = ifelse(is.na(Anzóis), 0, Anzóis)
+      )
+    
+    base_ap <- if (include_geral) {
+      bind_rows(
+        apetrechos %>% mutate(Localidade = as.character(Zona.de.Pesca)),
+        apetrechos %>% mutate(Localidade = "Geral")
+      )
+    } else {
+      apetrechos %>% mutate(Localidade = "Montante")
+    }
+    
+    comp_redes <- base_ap %>%
+      group_by(Localidade) %>%
+      summarise(Presença_ratio = mean(Redes == 1), .groups = "drop") %>%
+      mutate(Tipo = "Redes")
+    
+    comp_anzois <- base_ap %>%
+      group_by(Localidade) %>%
+      summarise(Presença_ratio = mean(Anzóis == 1), .groups = "drop") %>%
+      mutate(Tipo = "Anzóis")
+    
+    tab_ap <- bind_rows(comp_redes, comp_anzois)
+    
+    tab_ap_excel <- tab_ap %>%
+      mutate(
+        Percentual = round(100 * Presença_ratio, 2)
+      ) %>%
+      select(Localidade, Tipo, Percentual, Presença_ratio)
+    
+    write.xlsx(tab_ap_excel, "14_tabela_anzois_e_redes.xlsx", rowNames = FALSE)
+    
+    n_geral <- if (include_geral) dplyr::n_distinct(apetrechos$Nome.Completo) else NULL
+    n_fluvial <- if (include_geral) dplyr::n_distinct(apetrechos %>% filter(Zona.de.Pesca == "Fluvial") %>% pull(Nome.Completo)) else NULL
+    n_transicao <- if (include_geral) dplyr::n_distinct(apetrechos %>% filter(Zona.de.Pesca == "Transição") %>% pull(Nome.Completo)) else NULL
+    n_lacustre <- if (include_geral) dplyr::n_distinct(apetrechos %>% filter(Zona.de.Pesca == "Lacustre") %>% pull(Nome.Completo)) else NULL
+    n_montante <- if (!include_geral) dplyr::n_distinct(apetrechos$Nome.Completo) else NULL
+    
+    if (include_geral) {
+      painel_apetrecho_3zonas_n(
+        tab_ap,
+        titulo_painel = "Anzóis e redes em porcentagem",
+        nome_arquivo = "14_anzois_e_redes_em_porcentagem.png",
+        n_geral = n_geral,
+        n_fluvial = n_fluvial,
+        n_transicao = n_transicao,
+        n_lacustre = n_lacustre,
+        texto_n = "Número total de registros de pescadores"
+      )
+    } else {
+      painel_apetrecho_montante_n(
+        tab_ap,
+        titulo_painel = "Anzóis e redes em porcentagem",
+        nome_arquivo = "14_anzois_e_redes_em_porcentagem.png",
+        n_montante = n_montante,
+        texto_n = "Número total de registros de pescadores"
+      )
+    }
+  }
+  
+  message("Bloco concluído: ", nome_bloco)
+}
+
+#===========================================================
+# 11) EXECUÇÃO
+#===========================================================
+rodar_bloco(
+  df_socio = socio_3zonas,
+  nome_bloco = "3 zonas",
+  pasta_saida = "Saída 2025 - 3 zonas",
+  include_geral = TRUE
+)
+
+rodar_bloco(
+  df_socio = socio_montante,
+  nome_bloco = "montante",
+  pasta_saida = "Saída 2025 - Montante",
+  include_geral = FALSE
+)
+
+############################################################
+# FIM
+############################################################
