@@ -1,0 +1,170 @@
+# socioeconomico 2025 ####
+rm(list = ls())
+
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
+
+library(readxl)
+library(dplyr)
+library(tm)
+library(wordcloud)
+library(RColorBrewer)
+library(Cairo)
+
+# ============================================================
+# 1) CARREGAR DADOS
+# ============================================================
+
+socio_geral <- data.frame(
+  read_xlsx("Socioeconomico dos Pescadores 2025 FINAL 2.0.xlsx",
+            sheet = "cadastro")
+)
+
+socio_geral <- subset(socio_geral, Ano.de.referência == "2025")
+
+socio_geral$Data.de.nascimento <- as.Date(
+  socio_geral$Data.de.nascimento,
+  format = "%d/%m/%Y"
+)
+
+socio_geral$Seq <- seq(nrow(socio_geral))
+
+# ============================================================
+# 2) REMOVER DUPLICATAS
+# ============================================================
+
+socio_geral_unique <- socio_geral %>%
+  group_by(Nome.Completo) %>%
+  slice(1) %>%
+  ungroup()
+
+# ============================================================
+# 3) SEPARAR DADOS
+# ============================================================
+
+socio_reservatorio <- socio_geral_unique %>%
+  filter(Zona.de.Pesca != "Montante")
+
+socio_montante <- socio_geral_unique %>%
+  filter(Zona.de.Pesca == "Montante")
+
+# ============================================================
+# 4) PASTAS
+# ============================================================
+
+dir.create("Nuvem_palavras", showWarnings = FALSE)
+dir.create("Nuvem_palavras/Reservatorio", showWarnings = FALSE)
+dir.create("Nuvem_palavras/Montante", showWarnings = FALSE)
+
+# ============================================================
+# 5) FUNÇÃO WORDCLOUD AJUSTADA
+# ============================================================
+
+create_wordcloud <- function(text_column, title, file_name, pasta_saida, min_freq = 2) {
+  
+  text_column <- na.omit(text_column)
+  text_column <- text_column[text_column != ""]
+  
+  if (length(text_column) == 0) return(NULL)
+  
+  text_data <- paste(text_column, collapse = " ")
+  
+  corpus <- VCorpus(VectorSource(text_data))
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, content_transformer(removePunctuation))
+  corpus <- tm_map(corpus, content_transformer(removeNumbers))
+  corpus <- tm_map(corpus, removeWords, stopwords("portuguese"))
+  corpus <- tm_map(corpus, content_transformer(stripWhitespace))
+  
+  dtm <- TermDocumentMatrix(corpus)
+  matrix <- as.matrix(dtm)
+  words <- sort(rowSums(matrix), decreasing = TRUE)
+  
+  df <- data.frame(word = names(words), freq = words)
+  df <- df[df$freq >= min_freq, ]
+  
+  if (nrow(df) == 0) return(NULL)
+  
+  arquivo <- file.path(pasta_saida, paste0(file_name, ".png"))
+  
+  # 🔥 FIGURA MENOR (menos espaço branco)
+  CairoPNG(
+    filename = arquivo,
+    width = 800,
+    height = 800
+  )
+  
+  # 🔥 MARGEM REDUZIDA
+  par(mar = c(1, 1, 4, 1))
+  
+  set.seed(123)
+  
+  wordcloud(
+    words = df$word,
+    freq = df$freq,
+    min.freq = min_freq,
+    max.words = 40,
+    random.order = FALSE,
+    rot.per = 0.2,
+    scale = c(5, 1.5),   # 🔥 palavras maiores
+    colors = brewer.pal(8, "Dark2")
+  )
+  
+  # 🔥 TÍTULO MAIOR
+  mtext(
+    title,
+    side = 3,
+    line = 1,
+    cex = 1.8,
+    font = 2
+  )
+  
+  dev.off()
+  
+  print(paste("Salvo:", arquivo))
+}
+
+# ============================================================
+# 6) FUNÇÃO PARA RODAR BLOCO
+# ============================================================
+
+rodar_nuvens <- function(df, nome, pasta) {
+  
+  create_wordcloud(
+    df$`Qual.seria.sua.sugestão.para.melhorar.a.pesca.`,
+    paste0(nome, " - Sugestões"),
+    "01_sugestoes",
+    pasta
+  )
+  
+  create_wordcloud(
+    df$`Quais.são.os.principais.problemas.que.o.senhor.percebe.para.a.pesca.no.reservatório.de.Itaipu.`,
+    paste0(nome, " - Problemas"),
+    "02_problemas",
+    pasta
+  )
+  
+  create_wordcloud(
+    df$`Outros.problemas.de.saúde.`,
+    paste0(nome, " - Saúde"),
+    "03_saude",
+    pasta
+  )
+}
+
+# ============================================================
+# 7) RODAR (ORDEM CORRETA)
+# ============================================================
+
+# 🔥 PRIMEIRO: RESERVATÓRIO
+rodar_nuvens(
+  socio_reservatorio,
+  "Reservatório",
+  "Nuvem_palavras/Reservatorio"
+)
+
+# 🔥 DEPOIS: MONTANTE
+rodar_nuvens(
+  socio_montante,
+  "Montante",
+  "Nuvem_palavras/Montante"
+)
