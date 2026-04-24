@@ -10,7 +10,7 @@ rm(list = ls())
 #===========================================================
 # 1) DIRETÓRIO E PACOTES
 #===========================================================
-setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
 
 library(readxl)
 library(dplyr)
@@ -27,7 +27,7 @@ library(forcats)
 #===========================================================
 # 2) ARQUIVO BASE
 #===========================================================
-arquivo_base <- "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL.xlsx"
+arquivo_base <- "C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL.xlsx"
 
 #===========================================================
 # 3) LEITURA DAS PLANILHAS
@@ -99,16 +99,16 @@ cores_ajudantes_bin <- c(
 
 paleta_categorica_10 <- c(
   "#377eb8",
-           "#e41a1c",
-           "#4daf4a",
-           "#984ea3",
-           "#ff7f00",
-           "#ffff33",
-           "#a65628",
-           "#f781bf",
-           "#999999",
-           "#66c2a5",
-           "#440154"
+  "#e41a1c",
+  "#4daf4a",
+  "#984ea3",
+  "#ff7f00",
+  "#ffff33",
+  "#a65628",
+  "#f781bf",
+  "#999999",
+  "#66c2a5",
+  "#440154"
 )
 
 #===========================================================
@@ -1388,9 +1388,13 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 07 Tipos de embarcações
+  # 07 Tipos de embarcações
   col_barco <- "Material.do.Barco"
   if (col_barco %in% names(df_socio)) {
-    tab_barco <- preparar_tab_simples(df_socio, col_barco, include_geral = include_geral)
+    
+    tab_barco <- preparar_tab_simples(df_socio, col_barco, include_geral = include_geral) %>%
+      mutate(categoria = str_trim(as.character(categoria))) %>%
+      filter(!str_to_lower(categoria) %in% c("outro", "outros"))
     
     salvar_tabela_percentual(
       tab_barco,
@@ -1403,11 +1407,22 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
     categorias_barco <- sort(unique(as.character(tab_barco$categoria)))
     pal_barco <- paleta_alfabetica(categorias_barco)
     
-    n_geral <- if (include_geral) n_valido_simples(df_socio, col_barco, "Geral", TRUE) else NULL
-    n_fluvial <- if (include_geral) n_valido_simples(df_socio, col_barco, "Fluvial", TRUE) else NULL
-    n_transicao <- if (include_geral) n_valido_simples(df_socio, col_barco, "Transição", TRUE) else NULL
-    n_lacustre <- if (include_geral) n_valido_simples(df_socio, col_barco, "Lacustre", TRUE) else NULL
-    n_montante <- if (!include_geral) n_valido_simples(df_socio, col_barco, "Montante", FALSE) else NULL
+    n_barco_valido <- function(local, incl) {
+      base <- if (local == "Geral" && incl) df_socio else df_socio %>% filter(Zona.de.Pesca == local)
+      
+      base %>%
+        filter(!is.na(.data[[col_barco]]), .data[[col_barco]] != "") %>%
+        mutate(valor_barco = str_trim(as.character(.data[[col_barco]]))) %>%
+        filter(!str_to_lower(valor_barco) %in% c("outro", "outros")) %>%
+        summarise(n = dplyr::n_distinct(Nome.Completo)) %>%
+        pull(n)
+    }
+    
+    n_geral <- if (include_geral) n_barco_valido("Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_barco_valido("Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_barco_valido("Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_barco_valido("Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_barco_valido("Montante", FALSE) else NULL
     
     if (include_geral) {
       painel_pizza_3zonas_n(
@@ -1436,9 +1451,13 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 08 Tipos de motores
+  # 08 Tipos de motores
   col_motor <- "Propulsão"
   if (col_motor %in% names(df_socio)) {
-    tab_motor <- preparar_tab_simples(df_socio, col_motor, include_geral = include_geral)
+    
+    tab_motor <- preparar_tab_simples(df_socio, col_motor, include_geral = include_geral) %>%
+      mutate(categoria = str_trim(as.character(categoria))) %>%
+      filter(!str_to_lower(categoria) %in% c("outro", "outros"))
     
     salvar_tabela_percentual(
       tab_motor,
@@ -1451,11 +1470,22 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
     categorias_motor <- sort(unique(as.character(tab_motor$categoria)))
     pal_motor <- paleta_alfabetica(categorias_motor)
     
-    n_geral <- if (include_geral) n_valido_simples(df_socio, col_motor, "Geral", TRUE) else NULL
-    n_fluvial <- if (include_geral) n_valido_simples(df_socio, col_motor, "Fluvial", TRUE) else NULL
-    n_transicao <- if (include_geral) n_valido_simples(df_socio, col_motor, "Transição", TRUE) else NULL
-    n_lacustre <- if (include_geral) n_valido_simples(df_socio, col_motor, "Lacustre", TRUE) else NULL
-    n_montante <- if (!include_geral) n_valido_simples(df_socio, col_motor, "Montante", FALSE) else NULL
+    n_motor_valido <- function(local, incl) {
+      base <- if (local == "Geral" && incl) df_socio else df_socio %>% filter(Zona.de.Pesca == local)
+      
+      base %>%
+        filter(!is.na(.data[[col_motor]]), .data[[col_motor]] != "") %>%
+        mutate(valor_motor = str_trim(as.character(.data[[col_motor]]))) %>%
+        filter(!str_to_lower(valor_motor) %in% c("outro", "outros")) %>%
+        summarise(n = dplyr::n_distinct(Nome.Completo)) %>%
+        pull(n)
+    }
+    
+    n_geral <- if (include_geral) n_motor_valido("Geral", TRUE) else NULL
+    n_fluvial <- if (include_geral) n_motor_valido("Fluvial", TRUE) else NULL
+    n_transicao <- if (include_geral) n_motor_valido("Transição", TRUE) else NULL
+    n_lacustre <- if (include_geral) n_motor_valido("Lacustre", TRUE) else NULL
+    n_montante <- if (!include_geral) n_motor_valido("Montante", FALSE) else NULL
     
     if (include_geral) {
       painel_pizza_3zonas_n(
