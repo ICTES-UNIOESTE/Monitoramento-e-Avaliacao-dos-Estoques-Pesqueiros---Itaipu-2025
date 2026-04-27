@@ -27,7 +27,7 @@ library(forcats)
 #===========================================================
 # 2) ARQUIVO BASE
 #===========================================================
-arquivo_base <- "C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL.xlsx"
+arquivo_base <- "C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL 2.0.xlsx"
 
 #===========================================================
 # 3) LEITURA DAS PLANILHAS
@@ -539,7 +539,8 @@ fazer_plot_pizza <- function(tab_local, paleta, titulo_local = NULL,
 fazer_plot_barra_horizontal_local <- function(tab_local, localidade, titulo_local = NULL,
                                               subtitulo_local = NULL,
                                               mostrar_localidade = TRUE,
-                                              xlab = "Número de pescadores") {
+                                              xlab = "Número de pescadores",
+                                              ylab = NULL) {
   
   if (nrow(tab_local) == 0) return(plot_vazio(titulo_local, subtitulo_local))
   
@@ -561,7 +562,7 @@ fazer_plot_barra_horizontal_local <- function(tab_local, localidade, titulo_loca
       title = localidade_titulo(titulo_local, mostrar_localidade),
       subtitle = subtitulo_local,
       x = xlab,
-      y = NULL
+      y = ylab
     ) +
     tema_barra
 }
@@ -1514,6 +1515,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 09 Estrutura etária (sem legenda)
+  # 09 Estrutura etária (sem legenda)
   if ("Data.de.nascimento" %in% names(df_socio)) {
     df_idade <- df_socio %>%
       mutate(Idade = interval(Data.de.nascimento, Sys.Date()) %/% years(1)) %>%
@@ -1550,28 +1552,46 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         painel <- criar_painel_2x2(
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Geral"),
-            "Geral", "Geral",
-            subtitulo_n(n_geral, "Número total de registros de pescadores")
+            "Geral",
+            "Geral",
+            subtitulo_n(n_geral, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Classe etária"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Fluvial"),
-            "Fluvial", "Fluvial",
-            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+            "Fluvial",
+            "Fluvial",
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Classe etária"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Transição"),
-            "Transição", "Transição",
-            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+            "Transição",
+            "Transição",
+            subtitulo_n(n_transicao, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Classe etária"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Lacustre"),
-            "Lacustre", "Lacustre",
-            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+            "Lacustre",
+            "Lacustre",
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Classe etária"
           ) + theme(legend.position = "none"),
+          
           "Estrutura etária",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(painel, "09_estrutura_etaria.png", 1000, 1000)
+        
       } else {
         fig <- criar_figura_unica_montante(
           fazer_plot_barra_horizontal_local(
@@ -1579,7 +1599,9 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
             "Montante",
             titulo_local = NULL,
             subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
-            mostrar_localidade = FALSE
+            mostrar_localidade = FALSE,
+            xlab = "Número de pescadores",
+            ylab = "Classe etária"
           ) +
             theme(
               legend.position = "none",
@@ -1591,6 +1613,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
           "Estrutura etária",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(fig, "09_estrutura_etaria.png", 1000, 1000)
       }
     }
@@ -1634,27 +1657,41 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Geral"),
             "Geral", "Geral",
-            subtitulo_n(n_geral, "Número total de registros de pescadores")
+            subtitulo_n(n_geral, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Tempo de pesca"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Fluvial"),
             "Fluvial", "Fluvial",
-            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Tempo de pesca"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Transição"),
             "Transição", "Transição",
-            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+            subtitulo_n(n_transicao, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Tempo de pesca"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Lacustre"),
             "Lacustre", "Lacustre",
-            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Tempo de pesca"
           ) + theme(legend.position = "none"),
+          
           "Tempo de pesca no reservatório",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(painel, "10_tempo_de_pesca.png", 1000, 1000)
+        
       } else {
         fig <- criar_figura_unica_montante(
           fazer_plot_barra_horizontal_local(
@@ -1662,7 +1699,9 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
             "Montante",
             titulo_local = NULL,
             subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
-            mostrar_localidade = FALSE
+            mostrar_localidade = FALSE,
+            xlab = "Número de pescadores",
+            ylab = "Tempo de pesca"
           ) +
             theme(
               legend.position = "none",
@@ -1674,6 +1713,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
           "Tempo de pesca no rio",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(fig, "10_tempo_de_pesca.png", 1000, 1000)
       }
     }
@@ -1718,27 +1758,41 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
           fazer_plot_barra_horizontal_local(
             tab_anz %>% filter(Localidade == "Geral"),
             "Geral", "Geral",
-            subtitulo_n(n_geral, "Número total de registros de pescadores")
+            subtitulo_n(n_geral, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Número de anzóis"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_anz %>% filter(Localidade == "Fluvial"),
             "Fluvial", "Fluvial",
-            subtitulo_n(n_fluvial, "Número total de registros de pescadores")
+            subtitulo_n(n_fluvial, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Número de anzóis"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_anz %>% filter(Localidade == "Transição"),
             "Transição", "Transição",
-            subtitulo_n(n_transicao, "Número total de registros de pescadores")
+            subtitulo_n(n_transicao, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Número de anzóis"
           ) + theme(legend.position = "none"),
+          
           fazer_plot_barra_horizontal_local(
             tab_anz %>% filter(Localidade == "Lacustre"),
             "Lacustre", "Lacustre",
-            subtitulo_n(n_lacustre, "Número total de registros de pescadores")
+            subtitulo_n(n_lacustre, "Número total de registros de pescadores"),
+            xlab = "Número de pescadores",
+            ylab = "Número de anzóis"
           ) + theme(legend.position = "none"),
+          
           "Número de anzóis",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(painel, "11_numero_de_anzois.png", 1000, 1000)
+        
       } else {
         fig <- criar_figura_unica_montante(
           fazer_plot_barra_horizontal_local(
@@ -1746,7 +1800,9 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
             "Montante",
             titulo_local = NULL,
             subtitulo_local = subtitulo_n(n_montante, "Número total de registros de pescadores"),
-            mostrar_localidade = FALSE
+            mostrar_localidade = FALSE,
+            xlab = "Número de pescadores",
+            ylab = "Número de anzóis"
           ) +
             theme(
               legend.position = "none",
@@ -1758,6 +1814,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
           "Número de anzóis",
           mostrar_legenda = FALSE
         )
+        
         salvar_png(fig, "11_numero_de_anzois.png", 1000, 1000)
       }
     }
