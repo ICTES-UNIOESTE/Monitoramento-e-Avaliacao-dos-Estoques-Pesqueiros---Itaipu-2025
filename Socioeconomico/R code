@@ -1626,8 +1626,12 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
     
     if (nrow(df_tempo) > 0) {
       max_tempo <- max(df_tempo[[col_tempo]], na.rm = TRUE)
-      breaks_tempo <- seq(0, max_tempo + 5, by = 5)
-      labels_tempo <- paste0(breaks_tempo[-length(breaks_tempo)], "-", breaks_tempo[-1] - 1)
+      breaks_tempo <- seq(0, max_tempo + 10, by = 10)
+      labels_tempo <- paste0(
+        breaks_tempo[-length(breaks_tempo)] + ifelse(breaks_tempo[-length(breaks_tempo)] == 0, 0, 1),
+        "-",
+        breaks_tempo[-1]
+      )
       
       tab_tempo <- preparar_tab_classes(
         df_tempo,
