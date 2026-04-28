@@ -1389,7 +1389,6 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 07 Tipos de embarcações
-  # 07 Tipos de embarcações
   col_barco <- "Material.do.Barco"
   if (col_barco %in% names(df_socio)) {
     
@@ -1451,7 +1450,6 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
     }
   }
   
-  # 08 Tipos de motores
   # 08 Tipos de motores
   col_motor <- "Propulsão"
   if (col_motor %in% names(df_socio)) {
@@ -1839,6 +1837,49 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         salvar_png(fig, "11_numero_de_anzois.png", 1000, 1000)
       }
     }
+  }
+  
+  # 11.2 Total de anzóis - Montante
+  if (!include_geral && "Quantidade" %in% names(anzois_raw)) {
+    
+    sum_anzois_montante <- anzois_raw %>%
+      group_by(Parent.Row.ID) %>%
+      summarise(
+        Quantidade = sum(Quantidade, na.rm = TRUE),
+        .groups = "drop"
+      )
+    
+    merged_anzois_montante <- merge(
+      sum_anzois_montante,
+      df_socio,
+      by.x = "Parent.Row.ID",
+      by.y = "Row.ID",
+      all.y = FALSE
+    ) %>%
+      filter(
+        !is.na(Quantidade),
+        Quantidade > 0,
+        Zona.de.Pesca == "Montante"
+      )
+    
+    total_anzois_montante <- sum(merged_anzois_montante$Quantidade, na.rm = TRUE)
+    
+    tabela_total_anzois_montante <- data.frame(
+      Localidade = "Montante",
+      Total_anzois = total_anzois_montante,
+      N_pescadores = dplyr::n_distinct(merged_anzois_montante$Nome.Completo)
+    )
+    
+    write.xlsx(
+      tabela_total_anzois_montante,
+      "11_2_total_anzois_montante.xlsx",
+      rowNames = FALSE
+    )
+    
+    message(
+      "Total de anzóis na Montante = ",
+      format(total_anzois_montante, big.mark = ".", decimal.mark = ",")
+    )
   }
   
   # 12 Malhas de redes (sem legenda)
