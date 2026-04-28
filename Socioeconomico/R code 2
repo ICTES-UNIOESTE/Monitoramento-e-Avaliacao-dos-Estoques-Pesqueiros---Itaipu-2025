@@ -1515,13 +1515,14 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 09 Estrutura etária (sem legenda)
-  # 09 Estrutura etária (sem legenda)
   if ("Data.de.nascimento" %in% names(df_socio)) {
+    
     df_idade <- df_socio %>%
       mutate(Idade = interval(Data.de.nascimento, Sys.Date()) %/% years(1)) %>%
       filter(!is.na(Idade), Idade > 0)
     
     if (nrow(df_idade) > 0) {
+      
       breaks_idade <- c(20, 30, 40, 50, 60, 70, 80, 90)
       labels_idade <- c("20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89")
       
@@ -1532,7 +1533,13 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         labels = labels_idade,
         include_geral = include_geral,
         distinct_nome = TRUE
-      )
+      ) %>%
+        mutate(classe = factor(as.character(classe), levels = labels_idade)) %>%
+        tidyr::complete(
+          Localidade,
+          classe = factor(labels_idade, levels = labels_idade),
+          fill = list(valor = 0)
+        )
       
       salvar_tabela_percentual_generica(
         tab = tab_idade,
@@ -1549,6 +1556,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
       n_montante <- if (!include_geral) n_valido_classes(df_idade, "Idade", "Montante", FALSE, breaks_idade, labels_idade, TRUE) else NULL
       
       if (include_geral) {
+        
         painel <- criar_painel_2x2(
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Geral"),
@@ -1593,6 +1601,15 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         salvar_png(painel, "09_estrutura_etaria.png", 1000, 1000)
         
       } else {
+        
+        tab_idade <- tab_idade %>%
+          mutate(Localidade = "Montante") %>%
+          complete(
+            Localidade,
+            classe = factor(labels_idade, levels = labels_idade),
+            fill = list(valor = 0)
+          )
+        
         fig <- criar_figura_unica_montante(
           fazer_plot_barra_horizontal_local(
             tab_idade %>% filter(Localidade == "Montante"),
