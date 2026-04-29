@@ -1,0 +1,294 @@
+############################################################
+# GRÁFICO 06 - OUTRAS FONTES DE RENDA
+# TABELA ATUALIZADA
+############################################################
+
+rm(list = ls())
+
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
+
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(openxlsx)
+library(Cairo)
+library(stringr)
+library(patchwork)
+
+arquivo_renda <- "Outra fonte de renda.xlsx"
+
+dados <- read_xlsx(arquivo_renda, col_names = FALSE)
+
+paleta_categorica_10 <- c(
+  "#377eb8",
+  "#e41a1c",
+  "#4daf4a",
+  "#984ea3",
+  "#ff7f00",
+  "#ffff33",
+  "#a65628",
+  "#f781bf",
+  "#999999",
+  "#66c2a5",
+  "#440154"
+)
+
+tema_pizza <- theme_void() +
+  theme(
+    legend.position = "right",
+    legend.justification = "bottom",
+    legend.box.just = "right",
+    legend.direction = "vertical",
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 16, face = "bold"),
+    plot.title = element_text(size = 24, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 16, hjust = 0.5, margin = margin(t = 2, b = 4))
+  )
+
+salvar_png <- function(plot_obj, nome_arquivo, width = 1000, height = 1000) {
+  CairoPNG(nome_arquivo, width = width, height = height)
+  print(plot_obj)
+  dev.off()
+}
+
+subtitulo_n <- function(n, texto_base = "N") {
+  paste0(texto_base, " = ", format(n, big.mark = ".", decimal.mark = ","))
+}
+
+paleta_por_ordem <- function(ordem_categorias) {
+  cores <- rep(paleta_categorica_10, length.out = length(ordem_categorias))
+  stats::setNames(cores, ordem_categorias)
+}
+
+extrair_bloco <- function(dados, col_categoria, col_valor, localidade) {
+  dados %>%
+    slice(-1) %>%
+    transmute(
+      Localidade = localidade,
+      categoria = str_trim(as.character(.data[[names(dados)[col_categoria]]])),
+      valor = suppressWarnings(as.numeric(.data[[names(dados)[col_valor]]]))
+    ) %>%
+    filter(
+      !is.na(categoria),
+      categoria != "",
+      !is.na(valor),
+      categoria != "Total Geral"
+    ) %>%
+    group_by(Localidade, categoria) %>%
+    summarise(valor = sum(valor, na.rm = TRUE), .groups = "drop")
+}
+
+tab_montante <- extrair_bloco(dados, 1, 2, "Montante")
+tab_geral <- extrair_bloco(dados, 4, 5, "Geral")
+tab_fluvial <- extrair_bloco(dados, 7, 8, "Fluvial")
+tab_transicao <- extrair_bloco(dados, 10, 11, "Transição")
+tab_lacustre <- extrair_bloco(dados, 13, 14, "Lacustre")
+
+tab_reservatorio <- bind_rows(
+  tab_geral,
+  tab_fluvial,
+  tab_transicao,
+  tab_lacustre
+)
+
+salvar_tabela_percentual <- function(tab, nome_arquivo) {
+  tab_out <- tab %>%
+    group_by(Localidade) %>%
+    mutate(
+      Total_localidade = sum(valor, na.rm = TRUE),
+      Percentual = round(100 * valor / Total_localidade, 2)
+    ) %>%
+    ungroup() %>%
+    rename(
+      Outra_fonte_de_renda = categoria,
+      Valor = valor
+    )
+  
+  write.xlsx(tab_out, nome_arquivo, rowNames = FALSE)
+}
+
+fazer_plot_pizza <- function(tab_local, paleta, titulo_local = NULL,
+                             subtitulo_local = NULL,
+                             mostrar_localidade = TRUE,
+                             nome_legenda = "Atividades") {
+  
+  tab_local <- tab_local %>%
+    mutate(categoria = factor(categoria, levels = names(paleta))) %>%
+    complete(categoria, fill = list(valor = 0))
+  
+  ggplot(tab_local, aes(x = "", y = valor, fill = categoria)) +
+    geom_col(color = "black", linewidth = 0.05, width = 1) +
+    coord_polar("y", start = 0) +
+    scale_fill_manual(values = paleta, drop = FALSE, name = nome_legenda) +
+    labs(
+      title = if (mostrar_localidade) titulo_local else NULL,
+      subtitle = subtitulo_local
+    ) +
+    tema_pizza
+}
+
+design_2x2 <- "
+AC
+BD
+"
+
+criar_painel_2x2 <- function(plot_geral, plot_fluvial, plot_transicao, plot_lacustre,
+                             titulo_painel) {
+  
+  painel <- (plot_geral + plot_transicao + plot_fluvial + plot_lacustre) +
+    plot_layout(
+      guides = "collect",
+      design = design_2x2,
+      widths = c(1, 1),
+      heights = c(1, 1)
+    ) &
+    theme(
+      legend.position = "right",
+      legend.justification = "bottom",
+      legend.box.just = "right",
+      legend.direction = "vertical",
+      plot.margin = margin(8, 8, 8, 8)
+    )
+  
+  painel +
+    plot_annotation(
+      title = titulo_painel,
+      theme = theme(
+        plot.title = element_text(hjust = 0, size = 30, face = "bold"),
+        plot.margin = margin(10, 10, 10, 10)
+      )
+    )
+}
+
+criar_figura_unica_montante <- function(plot_obj, titulo_painel) {
+  plot_obj +
+    plot_annotation(
+      title = titulo_painel,
+      theme = theme(
+        plot.title = element_text(hjust = 0, size = 34, face = "bold"),
+        plot.margin = margin(10, 10, 10, 10)
+      )
+    ) &
+    theme(
+      legend.position = "right",
+      legend.justification = "bottom",
+      legend.box.just = "right",
+      legend.direction = "vertical",
+      legend.text = element_text(size = 24),
+      legend.title = element_text(size = 28, face = "bold"),
+      plot.subtitle = element_text(size = 24, hjust = 0, margin = margin(t = 4, b = 6)),
+      plot.margin = margin(8, 8, 8, 8)
+    )
+}
+
+dir.create("Saída 2025 - 3 zonas", showWarnings = FALSE, recursive = TRUE)
+dir.create("Saída 2025 - Montante", showWarnings = FALSE, recursive = TRUE)
+
+salvar_tabela_percentual(
+  tab_reservatorio,
+  "Saída 2025 - 3 zonas/06_tabela_outras_fontes_de_renda.xlsx"
+)
+
+ordem_geral <- tab_reservatorio %>%
+  filter(Localidade == "Geral") %>%
+  arrange(desc(valor), categoria) %>%
+  pull(categoria)
+
+paleta_geral <- paleta_por_ordem(ordem_geral)
+
+p_geral <- fazer_plot_pizza(
+  tab_reservatorio %>% filter(Localidade == "Geral"),
+  paleta = paleta_geral,
+  titulo_local = "Geral",
+  subtitulo_local = subtitulo_n(
+    sum(tab_reservatorio$valor[tab_reservatorio$Localidade == "Geral"]),
+    "Número total de registros"
+  ),
+  nome_legenda = "Atividades"
+) + theme(legend.position = "none")
+
+p_fluvial <- fazer_plot_pizza(
+  tab_reservatorio %>% filter(Localidade == "Fluvial"),
+  paleta = paleta_geral,
+  titulo_local = "Fluvial",
+  subtitulo_local = subtitulo_n(
+    sum(tab_reservatorio$valor[tab_reservatorio$Localidade == "Fluvial"]),
+    "Número total de registros"
+  ),
+  nome_legenda = "Atividades"
+) + theme(legend.position = "none")
+
+p_transicao <- fazer_plot_pizza(
+  tab_reservatorio %>% filter(Localidade == "Transição"),
+  paleta = paleta_geral,
+  titulo_local = "Transição",
+  subtitulo_local = subtitulo_n(
+    sum(tab_reservatorio$valor[tab_reservatorio$Localidade == "Transição"]),
+    "Número total de registros"
+  ),
+  nome_legenda = "Atividades"
+) + theme(legend.position = "none")
+
+p_lacustre <- fazer_plot_pizza(
+  tab_reservatorio %>% filter(Localidade == "Lacustre"),
+  paleta = paleta_geral,
+  titulo_local = "Lacustre",
+  subtitulo_local = subtitulo_n(
+    sum(tab_reservatorio$valor[tab_reservatorio$Localidade == "Lacustre"]),
+    "Número total de registros"
+  ),
+  nome_legenda = "Atividades"
+) + theme(legend.position = "none")
+
+painel_reservatorio <- criar_painel_2x2(
+  plot_geral = p_geral,
+  plot_fluvial = p_fluvial,
+  plot_transicao = p_transicao,
+  plot_lacustre = p_lacustre,
+  titulo_painel = "Outras fontes de renda"
+)
+
+salvar_png(
+  painel_reservatorio,
+  "Saída 2025 - 3 zonas/06_outras_fontes_de_renda.png",
+  1000,
+  1000
+)
+
+salvar_tabela_percentual(
+  tab_montante,
+  "Saída 2025 - Montante/06_tabela_outras_fontes_de_renda.xlsx"
+)
+
+ordem_montante <- tab_montante %>%
+  arrange(desc(valor), categoria) %>%
+  pull(categoria)
+
+paleta_montante <- paleta_por_ordem(ordem_montante)
+
+p_montante <- fazer_plot_pizza(
+  tab_montante,
+  paleta = paleta_montante,
+  titulo_local = NULL,
+  subtitulo_local = subtitulo_n(
+    sum(tab_montante$valor),
+    "Número total de registros"
+  ),
+  mostrar_localidade = FALSE,
+  nome_legenda = "Atividades"
+)
+
+fig_montante <- criar_figura_unica_montante(
+  p_montante,
+  "Outras fontes de renda"
+)
+
+salvar_png(
+  fig_montante,
+  "Saída 2025 - Montante/06_outras_fontes_de_renda.png",
+  1000,
+  1000
+)
+
+message("Gráfico 06 concluído para reservatório e montante.")
