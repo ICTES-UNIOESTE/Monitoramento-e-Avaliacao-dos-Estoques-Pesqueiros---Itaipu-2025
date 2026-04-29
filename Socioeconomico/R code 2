@@ -10,7 +10,7 @@ rm(list = ls())
 #===========================================================
 # 1) DIRETÓRIO E PACOTES
 #===========================================================
-setwd("C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
+setwd("C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025")
 
 library(readxl)
 library(dplyr)
@@ -27,7 +27,7 @@ library(forcats)
 #===========================================================
 # 2) ARQUIVO BASE
 #===========================================================
-arquivo_base <- "C:/Users/lg_ri/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL 2.0.xlsx"
+arquivo_base <- "C:/Users/Administrador/Dropbox/Postdoc/UNIOESTE/Relatórios Itaipu/R socioeconomico/Anual 2025/Socioeconomico dos Pescadores 2025 FINAL 2.0.xlsx"
 
 #===========================================================
 # 3) LEITURA DAS PLANILHAS
@@ -99,16 +99,16 @@ cores_ajudantes_bin <- c(
 
 paleta_categorica_10 <- c(
   "#377eb8",
-           "#e41a1c",
-           "#4daf4a",
-           "#984ea3",
-           "#ff7f00",
-           "#ffff33",
-           "#a65628",
-           "#f781bf",
-           "#999999",
-           "#66c2a5",
-           "#440154"
+  "#e41a1c",
+  "#4daf4a",
+  "#984ea3",
+  "#ff7f00",
+  "#ffff33",
+  "#a65628",
+  "#f781bf",
+  "#999999",
+  "#66c2a5",
+  "#440154"
 )
 
 #===========================================================
@@ -441,6 +441,30 @@ salvar_tabela_percentual_generica <- function(tab, nome_arquivo,
     multiplicar_100 = multiplicar_100
   )
 }
+
+#===========================================================
+# CLASSES GLOBAIS PARA TEMPO DE PESCA
+#===========================================================
+col_tempo_global <- "Há.quantos.anos.você.pesca."
+
+df_tempo_global <- socio_raw %>%
+  filter(
+    !is.na(.data[[col_tempo_global]]),
+    .data[[col_tempo_global]] > 0
+  )
+
+max_tempo_global <- max(df_tempo_global[[col_tempo_global]], na.rm = TRUE)
+
+limite_superior_tempo_global <- ceiling(max_tempo_global / 10) * 10
+
+breaks_tempo_global <- seq(0, limite_superior_tempo_global, by = 10)
+
+labels_tempo_global <- paste0(
+  breaks_tempo_global[-length(breaks_tempo_global)] +
+    ifelse(breaks_tempo_global[-length(breaks_tempo_global)] == 0, 0, 1),
+  "-",
+  breaks_tempo_global[-1]
+)
 
 #===========================================================
 # 7) PREPARAÇÃO DE TABELAS
@@ -1635,18 +1659,17 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   }
   
   # 10 Tempo de pesca (sem legenda)
+  # 10 Tempo de pesca (sem legenda)
   col_tempo <- "Há.quantos.anos.você.pesca."
   if (col_tempo %in% names(df_socio)) {
-    df_tempo <- df_socio %>% filter(!is.na(.data[[col_tempo]]), .data[[col_tempo]] > 0)
+    
+    df_tempo <- df_socio %>%
+      filter(!is.na(.data[[col_tempo]]), .data[[col_tempo]] > 0)
     
     if (nrow(df_tempo) > 0) {
-      max_tempo <- max(df_tempo[[col_tempo]], na.rm = TRUE)
-      breaks_tempo <- seq(0, max_tempo + 10, by = 10)
-      labels_tempo <- paste0(
-        breaks_tempo[-length(breaks_tempo)] + ifelse(breaks_tempo[-length(breaks_tempo)] == 0, 0, 1),
-        "-",
-        breaks_tempo[-1]
-      )
+      
+      breaks_tempo <- breaks_tempo_global
+      labels_tempo <- labels_tempo_global
       
       tab_tempo <- preparar_tab_classes(
         df_tempo,
@@ -1655,7 +1678,13 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         labels = labels_tempo,
         include_geral = include_geral,
         distinct_nome = TRUE
-      )
+      ) %>%
+        mutate(classe = factor(as.character(classe), levels = labels_tempo)) %>%
+        tidyr::complete(
+          Localidade,
+          classe = factor(labels_tempo, levels = labels_tempo),
+          fill = list(valor = 0)
+        )
       
       salvar_tabela_percentual_generica(
         tab = tab_tempo,
@@ -1672,6 +1701,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
       n_montante <- if (!include_geral) n_valido_classes(df_tempo, col_tempo, "Montante", FALSE, breaks_tempo, labels_tempo, TRUE) else NULL
       
       if (include_geral) {
+        
         painel <- criar_painel_2x2(
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Geral"),
@@ -1712,6 +1742,15 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         salvar_png(painel, "10_tempo_de_pesca.png", 1000, 1000)
         
       } else {
+        
+        tab_tempo <- tab_tempo %>%
+          mutate(Localidade = "Montante") %>%
+          complete(
+            Localidade,
+            classe = factor(labels_tempo, levels = labels_tempo),
+            fill = list(valor = 0)
+          )
+        
         fig <- criar_figura_unica_montante(
           fazer_plot_barra_horizontal_local(
             tab_tempo %>% filter(Localidade == "Montante"),
@@ -1736,8 +1775,7 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
         salvar_png(fig, "10_tempo_de_pesca.png", 1000, 1000)
       }
     }
-  }
-  
+  } 
   # 11 Número de anzóis (sem legenda)
   if ("Quantidade" %in% names(anzois_raw)) {
     sum_anzois <- aggregate(Quantidade ~ Parent.Row.ID, data = anzois_raw, sum)
@@ -2307,6 +2345,8 @@ rodar_bloco <- function(df_socio, nome_bloco, pasta_saida,
   
   message("Bloco concluído: ", nome_bloco)
 }
+
+
 
 #===========================================================
 # 11) EXECUÇÃO
